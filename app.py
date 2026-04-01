@@ -158,7 +158,8 @@ def generate_pdf(original, language, analysis):
     add_title("4. Corrected & Annotated Code:")
     add_text(analysis.get('corrected_code', ''))
 
-    return pdf.output(dest="S").encode("latin-1")
+    # THE FIX IS RIGHT HERE:
+    return bytes(pdf.output())
 
 # ==========================================
 # 3. FRONTEND LAYOUT
