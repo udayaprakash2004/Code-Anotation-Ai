@@ -1,5 +1,6 @@
 streamlit
 groq
+requests
 matplotlib
 numpy
 fpdf2
