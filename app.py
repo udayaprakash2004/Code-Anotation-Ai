@@ -6,376 +6,352 @@ from io import BytesIO
 import matplotlib.pyplot as plt
 import numpy as np
 import streamlit as st
-from fpdf import FPDF
 from groq import Groq
+from fpdf import FPDF
 
 
 # ============================================================
-# CODE SENSE AI
-# AI CODE ERROR DETECTOR + ANNOTATOR + COMPLEXITY ANALYZER
-# No user-code execution. No Piston API.
+# PAGE CONFIG
 # ============================================================
-
 st.set_page_config(
-    page_title="CodeSense AI",
+    page_title="CodeSense AI | Code Analyzer",
     page_icon="💻",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# ============================================================
-# PROFESSIONAL BLUE UI
-# ============================================================
-st.markdown("""
-<style>
-.stApp {
-    background:
-        radial-gradient(circle at 15% 5%, rgba(59,130,246,.28), transparent 28%),
-        radial-gradient(circle at 90% 15%, rgba(14,165,233,.18), transparent 25%),
-        linear-gradient(135deg, #041329 0%, #082c5c 48%, #0b4d8f 100%);
-    color: #f8fbff;
-}
-[data-testid="stHeader"] { background: transparent; }
-[data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #031126, #062a55);
-    border-right: 1px solid rgba(147,197,253,.22);
-}
-.block-container { padding-top: 1.4rem; max-width: 1500px; }
-
-.hero {
-    padding: 30px 34px;
-    border-radius: 24px;
-    background: linear-gradient(135deg, #0756c9, #0ea5e9);
-    box-shadow: 0 18px 55px rgba(0,0,0,.28);
-    margin-bottom: 22px;
-}
-.hero h1 { margin: 0; color: white; font-size: 43px; }
-.hero p { margin: 8px 0 0; color: #e0f2fe; font-size: 17px; }
-
-.card {
-    background: rgba(4,25,53,.68);
-    border: 1px solid rgba(147,197,253,.18);
-    border-radius: 18px;
-    padding: 18px;
-    margin-bottom: 15px;
-}
-
-.metric {
-    background: rgba(12,61,117,.70);
-    border: 1px solid rgba(147,197,253,.20);
-    border-radius: 16px;
-    padding: 15px;
-    text-align: center;
-}
-.metric-label { color: #bfdbfe; font-size: 12px; }
-.metric-value { color: white; font-size: 27px; font-weight: 800; }
-
-.stButton > button {
-    border-radius: 12px;
-    font-weight: 700;
-    min-height: 44px;
-}
-div[data-baseweb="tab"] {
-    border-radius: 10px;
-}
-</style>
-""", unsafe_allow_html=True)
-
 
 # ============================================================
-# GROQ SECRET
+# BLUE UI
+# ============================================================
+st.markdown(
+    """
+    <style>
+    .stApp {
+        background:
+            radial-gradient(circle at 10% 0%, rgba(59,130,246,.25), transparent 30%),
+            linear-gradient(135deg, #06152f 0%, #0b2a55 45%, #0f3b78 100%);
+        color: #eef6ff;
+    }
+
+    [data-testid="stHeader"] {
+        background: rgba(0,0,0,0);
+    }
+
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #06152f, #082b59);
+        border-right: 1px solid rgba(147,197,253,.20);
+    }
+
+    .hero {
+        padding: 28px 32px;
+        border-radius: 22px;
+        background: linear-gradient(135deg, rgba(37,99,235,.95), rgba(14,165,233,.82));
+        box-shadow: 0 18px 50px rgba(0,0,0,.25);
+        margin-bottom: 22px;
+    }
+
+    .hero h1 {
+        margin: 0;
+        font-size: 42px;
+        color: white;
+    }
+
+    .hero p {
+        margin: 8px 0 0 0;
+        font-size: 17px;
+        color: #e0f2fe;
+    }
+
+    .card {
+        background: rgba(8, 30, 62, .72);
+        border: 1px solid rgba(147,197,253,.18);
+        border-radius: 18px;
+        padding: 18px;
+        margin-bottom: 14px;
+        box-shadow: 0 10px 30px rgba(0,0,0,.16);
+    }
+
+    .metric-card {
+        background: rgba(15, 55, 105, .75);
+        border: 1px solid rgba(147,197,253,.20);
+        border-radius: 16px;
+        padding: 15px;
+        text-align: center;
+    }
+
+    .metric-label {
+        color: #bfdbfe;
+        font-size: 13px;
+    }
+
+    .metric-value {
+        color: white;
+        font-size: 25px;
+        font-weight: 700;
+        margin-top: 4px;
+    }
+
+    .status-ok {
+        color: #86efac;
+        font-weight: 700;
+    }
+
+    .status-error {
+        color: #fca5a5;
+        font-weight: 700;
+    }
+
+    .small {
+        color: #bfdbfe;
+        font-size: 13px;
+    }
+
+    .stButton > button {
+        border-radius: 12px;
+        font-weight: 700;
+        border: 0;
+    }
+
+    div[data-baseweb="tab-list"] {
+        gap: 8px;
+    }
+
+    div[data-baseweb="tab"] {
+        background: rgba(15,55,105,.55);
+        border-radius: 10px;
+        padding: 8px 14px;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+
+# ============================================================
+# SECRETS
 # ============================================================
 try:
-    GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
+    api_key = st.secrets["GROQ_API_KEY"]
 except Exception:
-    st.error(
-        "GROQ_API_KEY is missing. Add a NEW key in "
-        "Streamlit Cloud → Settings → Secrets."
-    )
+    st.error("GROQ_API_KEY is missing. Add it in Streamlit Cloud → Settings → Secrets.")
     st.stop()
 
 
 # ============================================================
 # SESSION STATE
 # ============================================================
-if "result" not in st.session_state:
-    st.session_state.result = None
-if "code" not in st.session_state:
-    st.session_state.code = ""
-if "language" not in st.session_state:
-    st.session_state.language = "Python"
-if "local_checks" not in st.session_state:
-    st.session_state.local_checks = []
-
-
-# ============================================================
-# LANGUAGE HELPERS
-# ============================================================
-EXTENSIONS = {
-    "Python": ".py",
-    "C++": ".cpp",
-    "Java": ".java",
+defaults = {
+    "analysis": None,
+    "original_code": "",
+    "language": "Python",
+    "local_diagnostics": [],
 }
+for key, value in defaults.items():
+    if key not in st.session_state:
+        st.session_state[key] = value
 
 
 # ============================================================
-# LOCAL STATIC ANALYSIS
-# This never executes user code.
+# LOCAL STATIC CHECKS
+# IMPORTANT: NO CODE IS EXECUTED.
 # ============================================================
-def python_static_check(code):
-    checks = []
-
+def check_python(code):
+    diagnostics = []
     try:
         ast.parse(code)
-        checks.append({
-            "severity": "success",
+        diagnostics.append({
+            "type": "success",
+            "message": "Python syntax is valid.",
             "line": None,
-            "title": "Python syntax is valid",
-            "message": "The Python parser accepted the submitted syntax."
         })
     except SyntaxError as e:
-        line = e.lineno or "?"
-        msg = e.msg or "Syntax error"
-        checks.append({
-            "severity": "error",
-            "line": line,
-            "title": msg,
-            "message": (
-                f"Python detected a syntax problem on line {line}. "
-                f"{e.text.strip() if e.text else ''}"
-            )
+        diagnostics.append({
+            "type": "error",
+            "message": e.msg,
+            "line": e.lineno,
+            "detail": e.text.strip() if e.text else "",
         })
+    return diagnostics
 
-    return checks
 
-
-def bracket_check(code):
-    checks = []
+def check_braces(code):
     pairs = {"(": ")", "[": "]", "{": "}"}
-    reverse = {")": "(", "]": "[", "}": "{"}
+    closing = {")": "(", "]": "[", "}": "{"}
     stack = []
 
-    in_string = False
-    quote = None
-    escaped = False
+    for line_no, line in enumerate(code.splitlines(), start=1):
+        in_string = False
+        quote = None
+        escaped = False
 
-    for line_no, line in enumerate(code.splitlines(), 1):
-        i = 0
-        while i < len(line):
-            ch = line[i]
-
+        for ch in line:
             if escaped:
                 escaped = False
-                i += 1
+                continue
+
+            if ch == "\\" and in_string:
+                escaped = True
+                continue
+
+            if ch in ('"', "'"):
+                if not in_string:
+                    in_string = True
+                    quote = ch
+                elif quote == ch:
+                    in_string = False
                 continue
 
             if in_string:
-                if ch == "\\":
-                    escaped = True
-                elif ch == quote:
-                    in_string = False
-                    quote = None
-                i += 1
-                continue
-
-            if ch in ("'", '"'):
-                in_string = True
-                quote = ch
-                i += 1
                 continue
 
             if ch in pairs:
                 stack.append((ch, line_no))
-            elif ch in reverse:
-                if not stack or stack[-1][0] != reverse[ch]:
-                    checks.append({
-                        "severity": "error",
+            elif ch in closing:
+                if not stack or stack[-1][0] != closing[ch]:
+                    return [{
+                        "type": "error",
+                        "message": f"Unexpected '{ch}'. Check bracket/brace matching.",
                         "line": line_no,
-                        "title": "Mismatched bracket or brace",
-                        "message": f"Unexpected '{ch}' on line {line_no}."
-                    })
-                    return checks
+                    }]
                 stack.pop()
 
-            i += 1
-
     if stack:
-        opening, line_no = stack[-1]
-        checks.append({
-            "severity": "error",
+        ch, line_no = stack[-1]
+        return [{
+            "type": "error",
+            "message": f"Missing closing '{pairs[ch]}'.",
             "line": line_no,
-            "title": "Missing closing bracket",
-            "message": f"'{opening}' opened on line {line_no} has no matching closing symbol."
-        })
-    else:
-        checks.append({
-            "severity": "success",
-            "line": None,
-            "title": "Brackets and braces balanced",
-            "message": "No unmatched brackets/braces were found."
-        })
+        }]
 
-    return checks
+    return [{
+        "type": "success",
+        "message": "Brackets and braces appear balanced.",
+        "line": None,
+    }]
 
 
-def semicolon_check(code, language):
-    checks = []
+def check_cpp_java(code, language):
+    diagnostics = check_braces(code)
+
     lines = code.splitlines()
 
-    if language not in ("C++", "Java"):
-        return checks
-
-    keywords_without_semicolon = (
-        "if", "else", "for", "while", "switch", "try", "catch", "finally",
-        "class", "public", "private", "protected"
-    )
-
-    declaration = re.compile(
-        r"^(?:const\s+)?(?:unsigned\s+|signed\s+)?"
-        r"(?:int|long|short|float|double|char|bool|string|String|boolean|"
-        r"auto|size_t|byte)\s+.+"
-    )
-
-    for line_no, raw in enumerate(lines, 1):
+    # Basic structural checks. These are intentionally conservative:
+    # the LLM performs the deeper language-aware review.
+    for i, raw in enumerate(lines, start=1):
         line = raw.strip()
 
         if not line or line.startswith("//") or line.startswith("#"):
             continue
 
-        if declaration.match(line):
-            if not line.endswith((";", "{", "}", ",")):
-                checks.append({
-                    "severity": "warning",
-                    "line": line_no,
-                    "title": "Possible missing semicolon",
-                    "message": "This statement appears to require ';' at the end."
+        if language == "C++":
+            control = re.match(r"^(if|for|while|switch)\s*\(.*\)\s*[^;{]*$", line)
+            declaration_like = re.match(
+                r"^(int|float|double|char|long|short|string|bool|auto)\s+.+$",
+                line
+            )
+
+            if declaration_like and not line.endswith(("{", "}", ";", ":")):
+                diagnostics.append({
+                    "type": "warning",
+                    "message": "Possible missing semicolon.",
+                    "line": i,
                 })
 
-        # Common assignment / output / return statements.
-        if (
-            ("=" in line or line.startswith(("return ", "cout ", "System.out.", "printf(")))
-            and not line.endswith((";", "{", "}", ",", ":"))
-            and not line.startswith(keywords_without_semicolon)
-        ):
-            checks.append({
-                "severity": "warning",
-                "line": line_no,
-                "title": "Possible missing semicolon",
-                "message": "This statement may need a terminating ';'."
-            })
+            if control and not line.endswith(("{", ";", ")")):
+                diagnostics.append({
+                    "type": "warning",
+                    "message": "Check control-statement syntax.",
+                    "line": i,
+                })
 
-    return checks
+        elif language == "Java":
+            declaration_like = re.match(
+                r"^(int|float|double|char|long|short|String|boolean|var)\s+.+$",
+                line
+            )
 
+            if declaration_like and not line.endswith(("{", "}", ";", ":")):
+                diagnostics.append({
+                    "type": "warning",
+                    "message": "Possible missing semicolon.",
+                    "line": i,
+                })
 
-def basic_language_check(code, language):
-    checks = []
-    checks.extend(bracket_check(code))
-    checks.extend(semicolon_check(code, language))
-
-    if language == "Java":
-        if "class " not in code:
-            checks.append({
-                "severity": "warning",
-                "line": None,
-                "title": "No Java class detected",
-                "message": "A Java source file normally contains a class declaration."
-            })
-
-    if language == "C++":
-        if "#include" not in code and "using namespace" not in code:
-            checks.append({
-                "severity": "warning",
-                "line": None,
-                "title": "No include directive detected",
-                "message": "Check whether required C++ headers are missing."
-            })
-
-    return checks
+    return diagnostics
 
 
-def local_static_analysis(code, language):
+def static_check(code, language):
     if language == "Python":
-        return python_static_check(code)
-    return basic_language_check(code, language)
+        return check_python(code)
+    return check_cpp_java(code, language)
 
 
 # ============================================================
-# AI ANALYSIS
+# GROQ ANALYSIS
 # ============================================================
-def analyze_with_groq(code, language, local_checks):
-    client = Groq(api_key=GROQ_API_KEY)
-
-    local_summary = json.dumps(local_checks, ensure_ascii=False)
+def get_ai_analysis(code, language):
+    client = Groq(api_key=api_key)
 
     prompt = f"""
 You are CodeSense AI, an expert compiler assistant, senior software engineer,
-debugger, code reviewer, algorithm analyst and security reviewer.
+debugger, algorithm analyst, and code reviewer.
 
-Analyze the submitted {language} source code WITHOUT executing it.
+Analyze this {language} program WITHOUT executing it.
 
-The application is a static analysis tool. Never claim that code was compiled
-or executed.
+Your job is to make the analysis useful to a student and interviewer.
 
-LOCAL STATIC CHECKS:
-{local_summary}
+You MUST:
+1. Identify syntax errors, including missing semicolons, brackets, braces,
+   incorrect indentation, invalid declarations, malformed statements, etc.
+2. Identify likely logical errors when they can be determined statically.
+3. Explain every important error in simple language.
+4. For each error, provide the line number when possible.
+5. Explain WHY the error happens and HOW to fix it.
+6. Give corrected code.
+7. Add useful comments to the corrected code.
+8. Explain the program briefly.
+9. Analyze time complexity (TC).
+10. Analyze space complexity (SC).
+11. Explain the reasoning behind TC and SC.
+12. Suggest practical optimization improvements.
+13. Give a code quality score from 0 to 100.
+14. Give a security score from 0 to 100.
+15. Mention potential security concerns if any.
+16. Do NOT execute the code.
+17. Do not claim that code is runtime-correct if it was not executed.
 
-Perform a detailed but student-friendly analysis.
+Return ONLY valid JSON with EXACTLY these keys:
 
-Requirements:
-1. Detect syntax errors.
-2. Detect likely missing semicolons.
-3. Detect missing/mismatched (), [], {{}}.
-4. Detect indentation problems for Python.
-5. Detect malformed declarations/statements where reasonably clear.
-6. Detect likely logical issues that can be identified without execution.
-7. Give line numbers whenever possible.
-8. Explain each problem in simple language.
-9. Explain why it occurs.
-10. Give an exact practical fix.
-11. Produce complete corrected and commented code.
-12. Briefly explain what the program does.
-13. Calculate/estimate Time Complexity (TC).
-14. Calculate/estimate Space Complexity (SC).
-15. Explain why the TC and SC are what you report.
-16. Suggest optimizations.
-17. Review common security problems.
-18. Give Code Quality Score 0-100.
-19. Give Security Score 0-100.
-20. Do not execute the code.
-21. Do not invent runtime output.
-22. If an issue cannot be confirmed statically, label it as a warning/possible issue.
-
-Return ONLY valid JSON. No Markdown fences.
-
-Exact JSON structure:
 {{
-  "status": "Valid|Errors Found|Warnings",
-  "program_summary": "Short explanation",
+  "status": "Valid / Errors Found / Warnings",
+  "summary": "Brief explanation of what the program does",
   "errors": [
     {{
       "line": 1,
-      "severity": "Error|Warning",
-      "title": "Short title",
-      "explanation": "Why it occurs",
-      "fix": "Exact fix"
+      "severity": "Error / Warning",
+      "title": "Short error title",
+      "explanation": "Why the problem occurs",
+      "fix": "How to fix it"
     }}
   ],
-  "corrected_code": "Complete corrected and commented source code",
+  "corrected_code": "Complete corrected and commented code",
   "time_complexity": "O(...)",
-  "time_explanation": "Detailed reason",
+  "time_explanation": "Reason for TC",
   "space_complexity": "O(...)",
-  "space_explanation": "Detailed reason",
-  "optimization_notes": "Useful improvements",
+  "space_explanation": "Reason for SC",
+  "optimization_notes": "Practical improvements",
   "quality_score": 0,
-  "quality_reason": "Why this score was given",
   "security_score": 0,
-  "security_notes": "Security observations",
-  "learning_notes": "Short student learning takeaway"
+  "security_notes": "Security observations"
 }}
+
+If there are no errors, return an empty errors array.
+Do not return Markdown fences.
 
 Language: {language}
 
-SOURCE CODE:
+Code:
 {code}
 """
 
@@ -386,170 +362,113 @@ SOURCE CODE:
             temperature=0.1,
             response_format={"type": "json_object"},
         )
-
-        raw = response.choices[0].message.content
-        return json.loads(raw)
-
-    except Exception as exc:
-        return {"error": str(exc)}
-
-
-# ============================================================
-# MERGE LOCAL + AI ERRORS
-# ============================================================
-def merge_errors(ai_result, local_checks):
-    errors = ai_result.get("errors", [])
-
-    for item in local_checks:
-        if item["severity"] == "success":
-            continue
-
-        duplicate = any(
-            str(x.get("line")) == str(item.get("line"))
-            and item["title"].lower() in str(x.get("title", "")).lower()
-            for x in errors
-        )
-
-        if not duplicate:
-            errors.insert(
-                0,
-                {
-                    "line": item.get("line"),
-                    "severity": "Error" if item["severity"] == "error" else "Warning",
-                    "title": item["title"],
-                    "explanation": item["message"],
-                    "fix": "Review the indicated line and apply the suggested correction."
-                }
-            )
-
-    ai_result["errors"] = errors
-
-    if any(e.get("severity") == "Error" for e in errors):
-        ai_result["status"] = "Errors Found"
-    elif errors:
-        ai_result["status"] = "Warnings"
-    else:
-        ai_result["status"] = "Valid"
-
-    return ai_result
+        return json.loads(response.choices[0].message.content)
+    except Exception as e:
+        return {"error": str(e)}
 
 
 # ============================================================
 # COMPLEXITY GRAPH
 # ============================================================
-def complexity_graph(tc):
-    normalized = str(tc).lower().replace(" ", "")
+def plot_complexity(tc):
+    text = str(tc).lower().replace(" ", "")
     n = np.linspace(1, 10, 200)
 
-    if "o(1)" in normalized:
+    if "o(1)" in text:
         y = np.ones_like(n)
-    elif "o(logn)" in normalized:
+    elif "o(logn)" in text:
         y = np.log(n)
-    elif "o(nlogn)" in normalized:
+    elif "o(nlogn)" in text:
         y = n * np.log(n)
-    elif "o(n^2)" in normalized or "o(n²)" in normalized:
+    elif "o(n^2)" in text or "o(n²)" in text:
         y = n ** 2
-    elif "o(n^3)" in normalized or "o(n³)" in normalized:
+    elif "o(n^3)" in text or "o(n³)" in text:
         y = n ** 3
-    elif "o(2^n)" in normalized:
+    elif "o(2^n)" in text:
         y = 2 ** n
-    elif "o(n)" in normalized:
+    elif "o(n)" in text:
         y = n
     else:
         y = n
 
-    fig, ax = plt.subplots(figsize=(8, 3.8))
+    fig, ax = plt.subplots(figsize=(7, 3.5))
     ax.plot(n, y, linewidth=2)
     ax.set_title(f"Time Complexity Growth — {tc}")
     ax.set_xlabel("Input Size (n)")
     ax.set_ylabel("Relative Operations")
-    ax.grid(alpha=0.20)
+    ax.grid(alpha=0.2)
     fig.tight_layout()
     return fig
 
 
 # ============================================================
-# PDF REPORT
+# PDF
 # ============================================================
-def generate_pdf(code, language, result):
+def generate_pdf(original, language, result):
     pdf = FPDF()
-    pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
+    pdf.set_auto_page_break(auto=True, margin=15)
 
     def safe(value):
         return str(value).encode("latin-1", "replace").decode("latin-1")
 
-    def heading(value, size=13):
+    def title(text, size=13):
         pdf.set_font("Helvetica", "B", size)
-        pdf.cell(0, 9, safe(value), ln=True)
+        pdf.cell(0, 9, safe(text), ln=True)
         pdf.set_font("Helvetica", "", 10)
 
-    def paragraph(value):
+    def text(value):
         pdf.multi_cell(0, 6, safe(value))
         pdf.ln(2)
 
     pdf.set_font("Helvetica", "B", 18)
-    pdf.cell(0, 12, safe(f"CodeSense AI — {language} Code Analysis Report"),
-             ln=True, align="C")
+    pdf.cell(0, 12, safe(f"CodeSense AI Report — {language}"), ln=True, align="C")
     pdf.ln(6)
 
-    heading("1. Analysis Status")
-    paragraph(result.get("status", "N/A"))
+    title("1. Analysis Status")
+    text(result.get("status", "N/A"))
 
-    heading("2. Program Summary")
-    paragraph(result.get("program_summary", "N/A"))
+    title("2. Program Summary")
+    text(result.get("summary", "N/A"))
 
-    heading("3. Errors and Warnings")
+    title("3. Detected Errors / Warnings")
     errors = result.get("errors", [])
-
     if not errors:
-        paragraph("No significant static errors or warnings were identified.")
+        text("No significant static errors were identified.")
     else:
-        for error in errors:
-            paragraph(
-                f"Line: {error.get('line', '?')}\n"
-                f"Severity: {error.get('severity', 'N/A')}\n"
-                f"Problem: {error.get('title', 'N/A')}\n"
-                f"Why: {error.get('explanation', 'N/A')}\n"
-                f"Fix: {error.get('fix', 'N/A')}"
+        for item in errors:
+            text(
+                f"Line {item.get('line', '?')} | {item.get('severity', '')} | "
+                f"{item.get('title', '')}\n"
+                f"Explanation: {item.get('explanation', '')}\n"
+                f"Fix: {item.get('fix', '')}"
             )
 
-    heading("4. Time Complexity")
-    paragraph(result.get("time_complexity", "N/A"))
-    paragraph(result.get("time_explanation", "N/A"))
+    title("4. Time Complexity (TC)")
+    text(result.get("time_complexity", "N/A"))
+    text(result.get("time_explanation", "N/A"))
 
-    heading("5. Space Complexity")
-    paragraph(result.get("space_complexity", "N/A"))
-    paragraph(result.get("space_explanation", "N/A"))
+    title("5. Space Complexity (SC)")
+    text(result.get("space_complexity", "N/A"))
+    text(result.get("space_explanation", "N/A"))
 
-    heading("6. Code Quality")
-    paragraph(
-        f"Score: {result.get('quality_score', 'N/A')}/100\n"
-        f"Reason: {result.get('quality_reason', 'N/A')}"
+    title("6. Quality & Security")
+    text(
+        f"Code Quality Score: {result.get('quality_score', 'N/A')}/100\n"
+        f"Security Score: {result.get('security_score', 'N/A')}/100\n"
+        f"Security Notes: {result.get('security_notes', 'N/A')}"
     )
 
-    heading("7. Security")
-    paragraph(
-        f"Score: {result.get('security_score', 'N/A')}/100\n"
-        f"Notes: {result.get('security_notes', 'N/A')}"
-    )
+    title("7. Optimization Notes")
+    text(result.get("optimization_notes", "N/A"))
 
-    heading("8. Optimization")
-    paragraph(result.get("optimization_notes", "N/A"))
+    title("8. Original Code")
+    text(original)
 
-    heading("9. Learning Takeaway")
-    paragraph(result.get("learning_notes", "N/A"))
+    title("9. Corrected & Annotated Code")
+    text(result.get("corrected_code", ""))
 
-    heading("10. Original Code")
-    paragraph(code)
-
-    heading("11. Corrected and Annotated Code")
-    paragraph(result.get("corrected_code", ""))
-
-    output = pdf.output()
-    if isinstance(output, str):
-        return output.encode("latin-1")
-    return bytes(output)
+    return bytes(pdf.output())
 
 
 # ============================================================
@@ -557,54 +476,50 @@ def generate_pdf(code, language, result):
 # ============================================================
 with st.sidebar:
     st.markdown("## 💻 CodeSense AI")
-    st.caption("AI Code Analyzer & Annotator")
-
+    st.caption("AI Code Analyzer • Debugger • Complexity Assistant")
     st.success("Groq AI connected")
 
     st.markdown("---")
-    st.markdown("### Supported Languages")
-    st.markdown("🐍 Python\n\n⚙️ C++\n\n☕ Java")
-
-    st.markdown("---")
-    st.markdown("### Analysis")
+    st.markdown("### What this app does")
     st.markdown(
         """
-        🔎 Syntax detection  
-        📍 Line-level explanation  
-        🔧 Automatic correction  
-        ⏱️ Time Complexity  
-        💾 Space Complexity  
-        🔐 Security review  
-        ⭐ Quality score  
-        📄 PDF report
+        - 🔎 Detects syntax problems
+        - 🧠 Explains errors
+        - ✨ Generates corrected code
+        - ⏱️ TC analysis
+        - 💾 SC analysis
+        - 🔐 Security review
+        - 📊 Quality score
+        - 📄 PDF report
         """
     )
 
     st.info(
-        "Safety mode enabled: this version does NOT execute submitted code "
-        "and does NOT use the public Piston API."
+        "Safety mode: code is analyzed but NOT executed in this application."
     )
 
 
 # ============================================================
 # HERO
 # ============================================================
-st.markdown("""
-<div class="hero">
-    <h1>💻 CodeSense AI</h1>
-    <p>
-        Intelligent source-code analysis, error explanation,
-        correction, annotation, TC/SC analysis and professional reporting.
-    </p>
-</div>
-""", unsafe_allow_html=True)
+st.markdown(
+    """
+    <div class="hero">
+        <h1>💻 CodeSense AI</h1>
+        <p>
+            Intelligent code analysis, error explanation, correction,
+            complexity analysis and professional reporting.
+        </p>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 
 # ============================================================
-# MAIN WORKSPACE
+# INPUT
 # ============================================================
-left, right = st.columns([1, 1.08], gap="large")
-
+left, right = st.columns([1, 1.05], gap="large")
 
 with left:
     st.markdown("### 🧑‍💻 Code Workspace")
@@ -616,245 +531,195 @@ with left:
     )
 
     code = st.text_area(
-        "Write or paste your code",
-        value=st.session_state.code,
-        height=550,
+        "Paste your code",
+        value=st.session_state.original_code,
+        height=520,
         placeholder=(
-            "Example C++:\n\n"
-            "#include <iostream>\n"
-            "using namespace std;\n\n"
+            "Example:\n\n"
             "int main() {\n"
             "    int a = 10\n"
-            "    cout << a;\n"
             "    return 0;\n"
             "}"
         ),
     )
 
-    st.caption(
-        "The application analyzes your source code. It does not compile "
-        "or execute it."
-    )
-
-    if st.button(
-        "🔍 Analyze & Annotate Code",
+    analyze = st.button(
+        "🔍 Analyze, Detect Errors & Correct Code",
         type="primary",
         use_container_width=True,
-    ):
-        if not code.strip():
-            st.warning("Please enter some code.")
-        else:
-            st.session_state.code = code
-            st.session_state.language = language
+    )
 
-            with st.spinner("Checking syntax and asking AI to analyze the code..."):
-                local_checks = local_static_analysis(code, language)
-                result = analyze_with_groq(code, language, local_checks)
+    if analyze:
+        if not code.strip():
+            st.warning("Please enter code first.")
+        else:
+            st.session_state.language = language
+            st.session_state.original_code = code
+
+            with st.spinner("Running static checks and AI analysis..."):
+                local = static_check(code, language)
+                result = get_ai_analysis(code, language)
+
+            st.session_state.local_diagnostics = local
 
             if "error" in result:
                 st.error(f"Groq API error: {result['error']}")
-                st.session_state.result = None
+                st.session_state.analysis = None
             else:
-                result = merge_errors(result, local_checks)
-                st.session_state.local_checks = local_checks
-                st.session_state.result = result
-                st.success("Analysis completed.")
+                st.session_state.analysis = result
+                st.success("Analysis completed successfully.")
 
 
+# ============================================================
+# OUTPUT
+# ============================================================
 with right:
     st.markdown("### 📊 Analysis Dashboard")
 
-    result = st.session_state.result
+    result = st.session_state.analysis
 
-    if result is None:
+    if not result:
         st.info(
-            "Enter code and click Analyze & Annotate Code. "
-            "Your results will appear here."
+            "Enter code on the left and click Analyze. "
+            "The app will inspect the code without running it."
         )
     else:
-        status = result.get("status", "Warnings")
+        status = result.get("status", "Unknown")
 
         if status == "Valid":
-            st.success("✅ Code analysis completed — no major problems detected.")
-        elif status == "Errors Found":
-            st.error("❌ Errors found. Review the explanations below.")
-        else:
+            st.success("✅ No major syntax problems detected.")
+        elif status == "Warnings":
             st.warning("⚠️ Analysis completed with warnings.")
+        else:
+            st.error("❌ Errors were detected and explained below.")
 
-        # Top metrics
-        m1, m2, m3, m4 = st.columns(4)
+        tabs = st.tabs(
+            [
+                "🚨 Errors",
+                "✨ Corrected Code",
+                "📈 Complexity",
+                "🔐 Quality & Security",
+                "📄 PDF Report",
+            ]
+        )
 
-        with m1:
-            st.markdown(
-                f'<div class="metric"><div class="metric-label">TC</div>'
-                f'<div class="metric-value">{result.get("time_complexity", "N/A")}</div></div>',
-                unsafe_allow_html=True,
-            )
-
-        with m2:
-            st.markdown(
-                f'<div class="metric"><div class="metric-label">SC</div>'
-                f'<div class="metric-value">{result.get("space_complexity", "N/A")}</div></div>',
-                unsafe_allow_html=True,
-            )
-
-        with m3:
-            st.markdown(
-                f'<div class="metric"><div class="metric-label">QUALITY</div>'
-                f'<div class="metric-value">{result.get("quality_score", "N/A")}</div></div>',
-                unsafe_allow_html=True,
-            )
-
-        with m4:
-            st.markdown(
-                f'<div class="metric"><div class="metric-label">SECURITY</div>'
-                f'<div class="metric-value">{result.get("security_score", "N/A")}</div></div>',
-                unsafe_allow_html=True,
-            )
-
-        tabs = st.tabs([
-            "🚨 Errors",
-            "✨ Corrected Code",
-            "📚 Explanation",
-            "📈 TC / SC",
-            "🔐 Quality",
-            "📄 PDF",
-        ])
-
-        # ----------------------------------------------------
-        # ERRORS
-        # ----------------------------------------------------
         with tabs[0]:
-            st.markdown("#### Detected Errors & Warnings")
+            st.markdown("#### Detected Problems")
 
             errors = result.get("errors", [])
-
             if not errors:
-                st.success("No significant problems were identified.")
+                st.success("No significant errors were identified.")
             else:
                 for item in errors:
                     line = item.get("line", "?")
-                    severity = item.get("severity", "Warning")
+                    severity = item.get("severity", "Error")
                     title = item.get("title", "Issue")
 
-                    icon = "🚨" if severity == "Error" else "⚠️"
-
                     with st.expander(
-                        f"{icon} Line {line} — {severity}: {title}",
+                        f"Line {line} • {severity} • {title}",
                         expanded=True,
                     ):
-                        st.markdown("**Why does this happen?**")
-                        st.write(item.get("explanation", "N/A"))
-
-                        st.markdown("**How do I fix it?**")
-                        st.success(item.get("fix", "N/A"))
+                        st.write("**Why:**", item.get("explanation", ""))
+                        st.write("**Fix:**", item.get("fix", ""))
 
             st.markdown("#### Local Static Checks")
-
-            for item in st.session_state.local_checks:
-                if item["severity"] == "error":
+            for d in st.session_state.local_diagnostics:
+                if d["type"] == "error":
                     st.error(
-                        f"Line {item.get('line', '?')}: "
-                        f"{item['title']} — {item['message']}"
+                        f"Line {d.get('line', '?')}: {d['message']}"
                     )
-                elif item["severity"] == "warning":
+                elif d["type"] == "warning":
                     st.warning(
-                        f"Line {item.get('line', '?')}: "
-                        f"{item['title']} — {item['message']}"
+                        f"Line {d.get('line', '?')}: {d['message']}"
                     )
                 else:
-                    st.success(item["message"])
+                    st.success(d["message"])
 
-        # ----------------------------------------------------
-        # CORRECTED CODE
-        # ----------------------------------------------------
         with tabs[1]:
-            st.markdown("#### ✨ Corrected & Annotated Code")
-
-            corrected = result.get("corrected_code", "")
-
+            st.markdown("#### AI Corrected & Annotated Code")
             st.code(
-                corrected,
+                result.get("corrected_code", ""),
                 language=language.lower(),
             )
 
-            st.info(
-                "The corrected version is generated for review. "
-                "This application intentionally does not execute it."
+            st.caption(
+                "The corrected code is generated for review. "
+                "This app does not execute it."
             )
 
-        # ----------------------------------------------------
-        # EXPLANATION
-        # ----------------------------------------------------
         with tabs[2]:
-            st.markdown("#### 📝 What Does This Code Do?")
-            st.write(result.get("program_summary", "N/A"))
+            st.markdown("#### Algorithm Complexity")
 
-            st.markdown("#### 🎓 Learning Takeaway")
-            st.info(result.get("learning_notes", "N/A"))
+            m1, m2 = st.columns(2)
 
-        # ----------------------------------------------------
-        # COMPLEXITY
-        # ----------------------------------------------------
-        with tabs[3]:
-            c1, c2 = st.columns(2)
+            with m1:
+                st.markdown(
+                    f"""
+                    <div class="metric-card">
+                        <div class="metric-label">TIME COMPLEXITY</div>
+                        <div class="metric-value">{result.get('time_complexity', 'N/A')}</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
 
-            with c1:
-                st.markdown("### ⏱️ Time Complexity")
-                st.metric("TC", result.get("time_complexity", "N/A"))
-                st.write(result.get("time_explanation", "N/A"))
+            with m2:
+                st.markdown(
+                    f"""
+                    <div class="metric-card">
+                        <div class="metric-label">SPACE COMPLEXITY</div>
+                        <div class="metric-value">{result.get('space_complexity', 'N/A')}</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
 
-            with c2:
-                st.markdown("### 💾 Space Complexity")
-                st.metric("SC", result.get("space_complexity", "N/A"))
-                st.write(result.get("space_explanation", "N/A"))
+            st.markdown("#### Why?")
+            st.info(result.get("time_explanation", "N/A"))
+            st.info(result.get("space_explanation", "N/A"))
 
-            st.markdown("### 📈 Complexity Visualization")
-            fig = complexity_graph(result.get("time_complexity", "O(n)"))
+            st.markdown("#### Complexity Growth")
+            fig = plot_complexity(result.get("time_complexity", "O(n)"))
             st.pyplot(fig)
             plt.close(fig)
 
-        # ----------------------------------------------------
-        # QUALITY
-        # ----------------------------------------------------
-        with tabs[4]:
+        with tabs[3]:
             q1, q2 = st.columns(2)
 
             with q1:
                 st.metric(
                     "Code Quality",
-                    f'{result.get("quality_score", 0)}/100'
+                    f"{result.get('quality_score', 0)}/100",
                 )
-                st.write(result.get("quality_reason", "N/A"))
 
             with q2:
                 st.metric(
                     "Security",
-                    f'{result.get("security_score", 0)}/100'
+                    f"{result.get('security_score', 0)}/100",
                 )
-                st.write(result.get("security_notes", "N/A"))
 
-            st.markdown("### 🚀 Optimization Suggestions")
-            st.success(result.get("optimization_notes", "N/A"))
+            st.markdown("#### Security Review")
+            st.info(result.get("security_notes", "No security notes."))
 
-        # ----------------------------------------------------
-        # PDF
-        # ----------------------------------------------------
-        with tabs[5]:
-            st.markdown("### 📄 Professional Analysis Report")
+            st.markdown("#### Optimization Suggestions")
+            st.success(result.get("optimization_notes", "No optimization notes."))
 
-            pdf_bytes = generate_pdf(
-                st.session_state.code,
+            st.markdown("#### Program Summary")
+            st.write(result.get("summary", "N/A"))
+
+        with tabs[4]:
+            pdf = generate_pdf(
+                st.session_state.original_code,
                 st.session_state.language,
                 result,
             )
 
-            st.success("Your complete report is ready.")
+            st.success("Professional PDF report is ready.")
 
             st.download_button(
-                "📥 Download Full PDF Report",
-                data=pdf_bytes,
-                file_name="CodeSense_AI_Report.pdf",
+                "📥 Download Complete PDF Report",
+                data=pdf,
+                file_name="CodeSense_AI_Code_Analysis_Report.pdf",
                 mime="application/pdf",
                 use_container_width=True,
             )
@@ -865,6 +730,6 @@ with right:
 # ============================================================
 st.markdown("---")
 st.caption(
-    "CodeSense AI • AI-powered static code analysis • "
-    "Python • C++ • Java • No arbitrary code execution"
+    "CodeSense AI • Static analysis only • No user code execution • "
+    "AI-powered code understanding and correction"
 )
