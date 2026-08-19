@@ -1,958 +1,870 @@
-import streamlit as st
-import os
+import ast
 import json
-import requests
+import re
+from io import BytesIO
+
 import matplotlib.pyplot as plt
 import numpy as np
-from io import StringIO
-import contextlib
-from groq import Groq
+import streamlit as st
 from fpdf import FPDF
+from groq import Groq
 
 
-# ==========================================
-# 1. PAGE SETUP
-# ==========================================
+# ============================================================
+# CODE SENSE AI
+# AI CODE ERROR DETECTOR + ANNOTATOR + COMPLEXITY ANALYZER
+# No user-code execution. No Piston API.
+# ============================================================
 
 st.set_page_config(
-    page_title="AI Code Annotator & Compiler",
-    layout="wide"
+    page_title="CodeSense AI",
+    page_icon="💻",
+    layout="wide",
+    initial_sidebar_state="expanded",
 )
 
+# ============================================================
+# PROFESSIONAL BLUE UI
+# ============================================================
+st.markdown("""
+<style>
+.stApp {
+    background:
+        radial-gradient(circle at 15% 5%, rgba(59,130,246,.28), transparent 28%),
+        radial-gradient(circle at 90% 15%, rgba(14,165,233,.18), transparent 25%),
+        linear-gradient(135deg, #041329 0%, #082c5c 48%, #0b4d8f 100%);
+    color: #f8fbff;
+}
+[data-testid="stHeader"] { background: transparent; }
+[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #031126, #062a55);
+    border-right: 1px solid rgba(147,197,253,.22);
+}
+.block-container { padding-top: 1.4rem; max-width: 1500px; }
 
-# ==========================================
-# 2. API KEYS
-# ==========================================
+.hero {
+    padding: 30px 34px;
+    border-radius: 24px;
+    background: linear-gradient(135deg, #0756c9, #0ea5e9);
+    box-shadow: 0 18px 55px rgba(0,0,0,.28);
+    margin-bottom: 22px;
+}
+.hero h1 { margin: 0; color: white; font-size: 43px; }
+.hero p { margin: 8px 0 0; color: #e0f2fe; font-size: 17px; }
 
+.card {
+    background: rgba(4,25,53,.68);
+    border: 1px solid rgba(147,197,253,.18);
+    border-radius: 18px;
+    padding: 18px;
+    margin-bottom: 15px;
+}
+
+.metric {
+    background: rgba(12,61,117,.70);
+    border: 1px solid rgba(147,197,253,.20);
+    border-radius: 16px;
+    padding: 15px;
+    text-align: center;
+}
+.metric-label { color: #bfdbfe; font-size: 12px; }
+.metric-value { color: white; font-size: 27px; font-weight: 800; }
+
+.stButton > button {
+    border-radius: 12px;
+    font-weight: 700;
+    min-height: 44px;
+}
+div[data-baseweb="tab"] {
+    border-radius: 10px;
+}
+</style>
+""", unsafe_allow_html=True)
+
+
+# ============================================================
+# GROQ SECRET
+# ============================================================
 try:
-    api_key = st.secrets["GROQ_API_KEY"]
-
-except KeyError:
+    GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
+except Exception:
     st.error(
-        "GROQ_API_KEY not found. "
-        "Please add it in Streamlit Cloud → Settings → Secrets."
+        "GROQ_API_KEY is missing. Add a NEW key in "
+        "Streamlit Cloud → Settings → Secrets."
     )
     st.stop()
 
 
-# ==========================================
-# 3. SESSION STATE
-# ==========================================
+# ============================================================
+# SESSION STATE
+# ============================================================
+if "result" not in st.session_state:
+    st.session_state.result = None
+if "code" not in st.session_state:
+    st.session_state.code = ""
+if "language" not in st.session_state:
+    st.session_state.language = "Python"
+if "local_checks" not in st.session_state:
+    st.session_state.local_checks = []
 
-if "analysis_result" not in st.session_state:
-    st.session_state.analysis_result = None
 
-if "original_code" not in st.session_state:
-    st.session_state.original_code = ""
+# ============================================================
+# LANGUAGE HELPERS
+# ============================================================
+EXTENSIONS = {
+    "Python": ".py",
+    "C++": ".cpp",
+    "Java": ".java",
+}
 
-if "selected_lang" not in st.session_state:
-    st.session_state.selected_lang = ""
+
+# ============================================================
+# LOCAL STATIC ANALYSIS
+# This never executes user code.
+# ============================================================
+def python_static_check(code):
+    checks = []
+
+    try:
+        ast.parse(code)
+        checks.append({
+            "severity": "success",
+            "line": None,
+            "title": "Python syntax is valid",
+            "message": "The Python parser accepted the submitted syntax."
+        })
+    except SyntaxError as e:
+        line = e.lineno or "?"
+        msg = e.msg or "Syntax error"
+        checks.append({
+            "severity": "error",
+            "line": line,
+            "title": msg,
+            "message": (
+                f"Python detected a syntax problem on line {line}. "
+                f"{e.text.strip() if e.text else ''}"
+            )
+        })
+
+    return checks
 
 
-# ==========================================
-# 4. GROQ AI ANALYSIS
-# ==========================================
+def bracket_check(code):
+    checks = []
+    pairs = {"(": ")", "[": "]", "{": "}"}
+    reverse = {")": "(", "]": "[", "}": "{"}
+    stack = []
 
-def get_groq_analysis(api_key, code, language):
+    in_string = False
+    quote = None
+    escaped = False
 
-    client = Groq(api_key=api_key)
+    for line_no, line in enumerate(code.splitlines(), 1):
+        i = 0
+        while i < len(line):
+            ch = line[i]
+
+            if escaped:
+                escaped = False
+                i += 1
+                continue
+
+            if in_string:
+                if ch == "\\":
+                    escaped = True
+                elif ch == quote:
+                    in_string = False
+                    quote = None
+                i += 1
+                continue
+
+            if ch in ("'", '"'):
+                in_string = True
+                quote = ch
+                i += 1
+                continue
+
+            if ch in pairs:
+                stack.append((ch, line_no))
+            elif ch in reverse:
+                if not stack or stack[-1][0] != reverse[ch]:
+                    checks.append({
+                        "severity": "error",
+                        "line": line_no,
+                        "title": "Mismatched bracket or brace",
+                        "message": f"Unexpected '{ch}' on line {line_no}."
+                    })
+                    return checks
+                stack.pop()
+
+            i += 1
+
+    if stack:
+        opening, line_no = stack[-1]
+        checks.append({
+            "severity": "error",
+            "line": line_no,
+            "title": "Missing closing bracket",
+            "message": f"'{opening}' opened on line {line_no} has no matching closing symbol."
+        })
+    else:
+        checks.append({
+            "severity": "success",
+            "line": None,
+            "title": "Brackets and braces balanced",
+            "message": "No unmatched brackets/braces were found."
+        })
+
+    return checks
+
+
+def semicolon_check(code, language):
+    checks = []
+    lines = code.splitlines()
+
+    if language not in ("C++", "Java"):
+        return checks
+
+    keywords_without_semicolon = (
+        "if", "else", "for", "while", "switch", "try", "catch", "finally",
+        "class", "public", "private", "protected"
+    )
+
+    declaration = re.compile(
+        r"^(?:const\s+)?(?:unsigned\s+|signed\s+)?"
+        r"(?:int|long|short|float|double|char|bool|string|String|boolean|"
+        r"auto|size_t|byte)\s+.+"
+    )
+
+    for line_no, raw in enumerate(lines, 1):
+        line = raw.strip()
+
+        if not line or line.startswith("//") or line.startswith("#"):
+            continue
+
+        if declaration.match(line):
+            if not line.endswith((";", "{", "}", ",")):
+                checks.append({
+                    "severity": "warning",
+                    "line": line_no,
+                    "title": "Possible missing semicolon",
+                    "message": "This statement appears to require ';' at the end."
+                })
+
+        # Common assignment / output / return statements.
+        if (
+            ("=" in line or line.startswith(("return ", "cout ", "System.out.", "printf(")))
+            and not line.endswith((";", "{", "}", ",", ":"))
+            and not line.startswith(keywords_without_semicolon)
+        ):
+            checks.append({
+                "severity": "warning",
+                "line": line_no,
+                "title": "Possible missing semicolon",
+                "message": "This statement may need a terminating ';'."
+            })
+
+    return checks
+
+
+def basic_language_check(code, language):
+    checks = []
+    checks.extend(bracket_check(code))
+    checks.extend(semicolon_check(code, language))
+
+    if language == "Java":
+        if "class " not in code:
+            checks.append({
+                "severity": "warning",
+                "line": None,
+                "title": "No Java class detected",
+                "message": "A Java source file normally contains a class declaration."
+            })
+
+    if language == "C++":
+        if "#include" not in code and "using namespace" not in code:
+            checks.append({
+                "severity": "warning",
+                "line": None,
+                "title": "No include directive detected",
+                "message": "Check whether required C++ headers are missing."
+            })
+
+    return checks
+
+
+def local_static_analysis(code, language):
+    if language == "Python":
+        return python_static_check(code)
+    return basic_language_check(code, language)
+
+
+# ============================================================
+# AI ANALYSIS
+# ============================================================
+def analyze_with_groq(code, language, local_checks):
+    client = Groq(api_key=GROQ_API_KEY)
+
+    local_summary = json.dumps(local_checks, ensure_ascii=False)
 
     prompt = f"""
-You are an expert software engineer, compiler,
-code reviewer, and algorithm analyst.
+You are CodeSense AI, an expert compiler assistant, senior software engineer,
+debugger, code reviewer, algorithm analyst and security reviewer.
 
-Analyze the following {language} code.
+Analyze the submitted {language} source code WITHOUT executing it.
 
-Perform these tasks:
+The application is a static analysis tool. Never claim that code was compiled
+or executed.
 
-1. Find and fix syntax errors.
-2. Find and fix indentation errors.
-3. Fix obvious logical errors.
-4. Add useful comments explaining important parts.
-5. Preserve the original purpose of the program.
-6. Analyze time complexity.
-7. Analyze space complexity.
-8. Suggest optimization improvements.
-9. Return the complete corrected code.
+LOCAL STATIC CHECKS:
+{local_summary}
 
-IMPORTANT:
+Perform a detailed but student-friendly analysis.
 
-Return ONLY a valid JSON object.
+Requirements:
+1. Detect syntax errors.
+2. Detect likely missing semicolons.
+3. Detect missing/mismatched (), [], {{}}.
+4. Detect indentation problems for Python.
+5. Detect malformed declarations/statements where reasonably clear.
+6. Detect likely logical issues that can be identified without execution.
+7. Give line numbers whenever possible.
+8. Explain each problem in simple language.
+9. Explain why it occurs.
+10. Give an exact practical fix.
+11. Produce complete corrected and commented code.
+12. Briefly explain what the program does.
+13. Calculate/estimate Time Complexity (TC).
+14. Calculate/estimate Space Complexity (SC).
+15. Explain why the TC and SC are what you report.
+16. Suggest optimizations.
+17. Review common security problems.
+18. Give Code Quality Score 0-100.
+19. Give Security Score 0-100.
+20. Do not execute the code.
+21. Do not invent runtime output.
+22. If an issue cannot be confirmed statically, label it as a warning/possible issue.
 
-The JSON must contain EXACTLY these five keys:
+Return ONLY valid JSON. No Markdown fences.
 
+Exact JSON structure:
 {{
-    "corrected_code": "Complete corrected and commented code",
-    "syntax_corrections": "Explain syntax, indentation, and logical corrections",
-    "time_complexity": "Example: O(n)",
-    "space_complexity": "Example: O(1)",
-    "optimization_notes": "Explain optimization improvements"
+  "status": "Valid|Errors Found|Warnings",
+  "program_summary": "Short explanation",
+  "errors": [
+    {{
+      "line": 1,
+      "severity": "Error|Warning",
+      "title": "Short title",
+      "explanation": "Why it occurs",
+      "fix": "Exact fix"
+    }}
+  ],
+  "corrected_code": "Complete corrected and commented source code",
+  "time_complexity": "O(...)",
+  "time_explanation": "Detailed reason",
+  "space_complexity": "O(...)",
+  "space_explanation": "Detailed reason",
+  "optimization_notes": "Useful improvements",
+  "quality_score": 0,
+  "quality_reason": "Why this score was given",
+  "security_score": 0,
+  "security_notes": "Security observations",
+  "learning_notes": "Short student learning takeaway"
 }}
 
-Do NOT return Markdown.
-Do NOT use ```json.
-Do NOT add text before or after the JSON.
+Language: {language}
 
-Programming language:
-{language}
-
-Code:
-
+SOURCE CODE:
 {code}
 """
 
     try:
-
         response = client.chat.completions.create(
             model="openai/gpt-oss-120b",
-
-            messages=[
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-
+            messages=[{"role": "user", "content": prompt}],
             temperature=0.1,
-
-            response_format={
-                "type": "json_object"
-            }
+            response_format={"type": "json_object"},
         )
 
-        response_text = response.choices[0].message.content
+        raw = response.choices[0].message.content
+        return json.loads(raw)
 
-        response_text = (
-            response_text
-            .replace("```json", "")
-            .replace("```", "")
-            .strip()
+    except Exception as exc:
+        return {"error": str(exc)}
+
+
+# ============================================================
+# MERGE LOCAL + AI ERRORS
+# ============================================================
+def merge_errors(ai_result, local_checks):
+    errors = ai_result.get("errors", [])
+
+    for item in local_checks:
+        if item["severity"] == "success":
+            continue
+
+        duplicate = any(
+            str(x.get("line")) == str(item.get("line"))
+            and item["title"].lower() in str(x.get("title", "")).lower()
+            for x in errors
         )
 
-        return json.loads(response_text)
-
-    except Exception as e:
-
-        return {
-            "error": str(e)
-        }
-
-
-# ==========================================
-# 5. PISTON CODE EXECUTION
-# ==========================================
-
-PISTON_URL = "https://emkc.org/api/v2/piston"
-
-
-def get_piston_runtime(language):
-
-    """
-    Gets an available Piston runtime for the selected language.
-    """
-
-    language_map = {
-        "Python": ["python", "py", "python3"],
-        "C++": ["c++", "cpp"],
-        "Java": ["java"]
-    }
-
-    requested_names = language_map.get(language, [])
-
-    try:
-
-        response = requests.get(
-            f"{PISTON_URL}/runtimes",
-            timeout=10
-        )
-
-        response.raise_for_status()
-
-        runtimes = response.json()
-
-        for runtime in runtimes:
-
-            runtime_language = runtime.get(
-                "language",
-                ""
-            ).lower()
-
-            aliases = [
-                str(alias).lower()
-                for alias in runtime.get(
-                    "aliases",
-                    []
-                )
-            ]
-
-            if (
-                runtime_language in requested_names
-                or any(
-                    name in aliases
-                    for name in requested_names
-                )
-            ):
-
-                return {
-                    "language": runtime["language"],
-                    "version": runtime["version"]
+        if not duplicate:
+            errors.insert(
+                0,
+                {
+                    "line": item.get("line"),
+                    "severity": "Error" if item["severity"] == "error" else "Warning",
+                    "title": item["title"],
+                    "explanation": item["message"],
+                    "fix": "Review the indicated line and apply the suggested correction."
                 }
+            )
 
-        return None
+    ai_result["errors"] = errors
 
-    except Exception as e:
-
-        return {
-            "error": str(e)
-        }
-
-
-def execute_code(code, language, stdin=""):
-
-    """
-    Executes Python, C++, and Java code using
-    the Piston code execution API.
-    """
-
-    # --------------------------------------
-    # Get runtime
-    # --------------------------------------
-
-    runtime = get_piston_runtime(language)
-
-    if runtime is None:
-
-        return (
-            "Execution Error:\n"
-            f"No Piston runtime found for {language}."
-        )
-
-    if "error" in runtime:
-
-        return (
-            "Execution Service Error:\n"
-            + runtime["error"]
-        )
-
-
-    # --------------------------------------
-    # File names
-    # --------------------------------------
-
-    if language == "Python":
-
-        filename = "main.py"
-
-    elif language == "C++":
-
-        filename = "main.cpp"
-
-    elif language == "Java":
-
-        filename = "Main.java"
-
+    if any(e.get("severity") == "Error" for e in errors):
+        ai_result["status"] = "Errors Found"
+    elif errors:
+        ai_result["status"] = "Warnings"
     else:
+        ai_result["status"] = "Valid"
 
-        return "Unsupported programming language."
+    return ai_result
 
 
-    # --------------------------------------
-    # Request payload
-    # --------------------------------------
+# ============================================================
+# COMPLEXITY GRAPH
+# ============================================================
+def complexity_graph(tc):
+    normalized = str(tc).lower().replace(" ", "")
+    n = np.linspace(1, 10, 200)
 
-    payload = {
-        "language": runtime["language"],
-        "version": runtime["version"],
-
-        "files": [
-            {
-                "name": filename,
-                "content": code
-            }
-        ],
-
-        "stdin": stdin,
-
-        "args": [],
-
-        "compile_timeout": 10000,
-
-        "run_timeout": 5000,
-
-        "compile_cpu_time": 10000,
-
-        "run_cpu_time": 5000
-    }
-
-
-    # --------------------------------------
-    # Execute
-    # --------------------------------------
-
-    try:
-
-        response = requests.post(
-            f"{PISTON_URL}/execute",
-            json=payload,
-            timeout=20
-        )
-
-        if response.status_code != 200:
-
-            return (
-                "Execution API Error:\n"
-                f"HTTP {response.status_code}\n\n"
-                f"{response.text}"
-            )
-
-        result = response.json()
-
-
-        # --------------------------------------
-        # Compilation result
-        # --------------------------------------
-
-        compile_result = result.get(
-            "compile"
-        )
-
-        if compile_result:
-
-            compile_stderr = compile_result.get(
-                "stderr",
-                ""
-            )
-
-            compile_stdout = compile_result.get(
-                "stdout",
-                ""
-            )
-
-            compile_code = compile_result.get(
-                "code"
-            )
-
-            if (
-                compile_code not in [0, None]
-                or compile_stderr.strip()
-            ):
-
-                output = "Compilation Error:\n\n"
-
-                if compile_stderr:
-
-                    output += compile_stderr
-
-                if compile_stdout:
-
-                    output += "\n" + compile_stdout
-
-                return output
-
-
-        # --------------------------------------
-        # Run result
-        # --------------------------------------
-
-        run_result = result.get(
-            "run"
-        )
-
-        if not run_result:
-
-            return "No execution result was returned."
-
-
-        stdout = run_result.get(
-            "stdout",
-            ""
-        )
-
-        stderr = run_result.get(
-            "stderr",
-            ""
-        )
-
-        exit_code = run_result.get(
-            "code"
-        )
-
-
-        # --------------------------------------
-        # Runtime error
-        # --------------------------------------
-
-        if (
-            exit_code not in [0, None]
-            or stderr.strip()
-        ):
-
-            output = ""
-
-            if stdout:
-
-                output += stdout
-
-            if stderr:
-
-                output += "\n\nRuntime Error:\n"
-                output += stderr
-
-            if not output:
-
-                output = "Program terminated with an error."
-
-            return output
-
-
-        # --------------------------------------
-        # Successful output
-        # --------------------------------------
-
-        if stdout:
-
-            return stdout
-
-        return "Program executed successfully with no output."
-
-
-    except requests.exceptions.Timeout:
-
-        return (
-            "Execution timed out.\n"
-            "The program took too long to compile or run."
-        )
-
-    except requests.exceptions.RequestException as e:
-
-        return (
-            "Connection error while contacting "
-            "the code execution service:\n"
-            f"{e}"
-        )
-
-    except Exception as e:
-
-        return (
-            "Unexpected execution error:\n"
-            f"{e}"
-        )
-
-
-# ==========================================
-# 6. COMPLEXITY GRAPH
-# ==========================================
-
-def plot_complexity(time_complex):
-
-    fig, ax = plt.subplots(
-        figsize=(5, 3)
-    )
-
-    n = np.linspace(
-        1,
-        10,
-        100
-    )
-
-    complexity = str(
-        time_complex
-    ).lower()
-
-    complexity = (
-        complexity
-        .replace(" ", "")
-        .replace("²", "^2")
-        .replace("³", "^3")
-    )
-
-
-    if "o(1)" in complexity:
-
+    if "o(1)" in normalized:
         y = np.ones_like(n)
-
-    elif "o(logn)" in complexity:
-
+    elif "o(logn)" in normalized:
         y = np.log(n)
-
-    elif "o(nlogn)" in complexity:
-
+    elif "o(nlogn)" in normalized:
         y = n * np.log(n)
-
-    elif "o(n^2)" in complexity:
-
+    elif "o(n^2)" in normalized or "o(n²)" in normalized:
         y = n ** 2
-
-    elif "o(n^3)" in complexity:
-
+    elif "o(n^3)" in normalized or "o(n³)" in normalized:
         y = n ** 3
-
-    elif "o(2^n)" in complexity:
-
+    elif "o(2^n)" in normalized:
         y = 2 ** n
-
-    elif "o(n)" in complexity:
-
+    elif "o(n)" in normalized:
         y = n
-
     else:
-
         y = n
 
-
-    ax.plot(
-        n,
-        y,
-        label=time_complex
-    )
-
-    ax.set_title(
-        "Time Complexity Growth"
-    )
-
-    ax.set_xlabel(
-        "Input Size (n)"
-    )
-
-    ax.set_ylabel(
-        "Operations"
-    )
-
-    ax.legend()
-
+    fig, ax = plt.subplots(figsize=(8, 3.8))
+    ax.plot(n, y, linewidth=2)
+    ax.set_title(f"Time Complexity Growth — {tc}")
+    ax.set_xlabel("Input Size (n)")
+    ax.set_ylabel("Relative Operations")
+    ax.grid(alpha=0.20)
+    fig.tight_layout()
     return fig
 
 
-# ==========================================
-# 7. PDF GENERATION
-# ==========================================
-
-def generate_pdf(
-    original,
-    language,
-    analysis
-):
-
+# ============================================================
+# PDF REPORT
+# ============================================================
+def generate_pdf(code, language, result):
     pdf = FPDF()
-
+    pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
 
-    pdf.set_font(
-        "Arial",
-        size=12
-    )
+    def safe(value):
+        return str(value).encode("latin-1", "replace").decode("latin-1")
 
+    def heading(value, size=13):
+        pdf.set_font("Helvetica", "B", size)
+        pdf.cell(0, 9, safe(value), ln=True)
+        pdf.set_font("Helvetica", "", 10)
 
-    def add_title(text):
+    def paragraph(value):
+        pdf.multi_cell(0, 6, safe(value))
+        pdf.ln(2)
 
-        pdf.set_font(
-            "Arial",
-            "B",
-            14
-        )
+    pdf.set_font("Helvetica", "B", 18)
+    pdf.cell(0, 12, safe(f"CodeSense AI — {language} Code Analysis Report"),
+             ln=True, align="C")
+    pdf.ln(6)
 
-        pdf.cell(
-            200,
-            10,
-            txt=text,
-            ln=True,
-            align="L"
-        )
+    heading("1. Analysis Status")
+    paragraph(result.get("status", "N/A"))
 
-        pdf.set_font(
-            "Arial",
-            size=10
-        )
+    heading("2. Program Summary")
+    paragraph(result.get("program_summary", "N/A"))
 
+    heading("3. Errors and Warnings")
+    errors = result.get("errors", [])
 
-    def add_text(text):
-
-        safe_text = (
-            str(text)
-            .encode(
-                "latin-1",
-                "replace"
+    if not errors:
+        paragraph("No significant static errors or warnings were identified.")
+    else:
+        for error in errors:
+            paragraph(
+                f"Line: {error.get('line', '?')}\n"
+                f"Severity: {error.get('severity', 'N/A')}\n"
+                f"Problem: {error.get('title', 'N/A')}\n"
+                f"Why: {error.get('explanation', 'N/A')}\n"
+                f"Fix: {error.get('fix', 'N/A')}"
             )
-            .decode("latin-1")
-        )
 
-        pdf.multi_cell(
-            0,
-            7,
-            txt=safe_text
-        )
+    heading("4. Time Complexity")
+    paragraph(result.get("time_complexity", "N/A"))
+    paragraph(result.get("time_explanation", "N/A"))
 
-        pdf.ln(5)
+    heading("5. Space Complexity")
+    paragraph(result.get("space_complexity", "N/A"))
+    paragraph(result.get("space_explanation", "N/A"))
 
-
-    pdf.set_font(
-        "Arial",
-        "B",
-        16
+    heading("6. Code Quality")
+    paragraph(
+        f"Score: {result.get('quality_score', 'N/A')}/100\n"
+        f"Reason: {result.get('quality_reason', 'N/A')}"
     )
 
-    pdf.cell(
-        200,
-        10,
-        txt=f"AI Code Analysis Report ({language})",
-        ln=True,
-        align="C"
+    heading("7. Security")
+    paragraph(
+        f"Score: {result.get('security_score', 'N/A')}/100\n"
+        f"Notes: {result.get('security_notes', 'N/A')}"
     )
 
-    pdf.ln(10)
+    heading("8. Optimization")
+    paragraph(result.get("optimization_notes", "N/A"))
+
+    heading("9. Learning Takeaway")
+    paragraph(result.get("learning_notes", "N/A"))
+
+    heading("10. Original Code")
+    paragraph(code)
+
+    heading("11. Corrected and Annotated Code")
+    paragraph(result.get("corrected_code", ""))
+
+    output = pdf.output()
+    if isinstance(output, str):
+        return output.encode("latin-1")
+    return bytes(output)
 
 
-    add_title(
-        "1. Original Code:"
+# ============================================================
+# SIDEBAR
+# ============================================================
+with st.sidebar:
+    st.markdown("## 💻 CodeSense AI")
+    st.caption("AI Code Analyzer & Annotator")
+
+    st.success("Groq AI connected")
+
+    st.markdown("---")
+    st.markdown("### Supported Languages")
+    st.markdown("🐍 Python\n\n⚙️ C++\n\n☕ Java")
+
+    st.markdown("---")
+    st.markdown("### Analysis")
+    st.markdown(
+        """
+        🔎 Syntax detection  
+        📍 Line-level explanation  
+        🔧 Automatic correction  
+        ⏱️ Time Complexity  
+        💾 Space Complexity  
+        🔐 Security review  
+        ⭐ Quality score  
+        📄 PDF report
+        """
     )
 
-    add_text(
-        original
-    )
-
-
-    add_title(
-        "2. Syntax & Indentation Corrections:"
-    )
-
-    add_text(
-        analysis.get(
-            "syntax_corrections",
-            "None"
-        )
-    )
-
-
-    add_title(
-        "3. Complexity Analysis:"
-    )
-
-    add_text(
-        f"Time: {analysis.get('time_complexity', 'N/A')}"
-    )
-
-    add_text(
-        f"Space: {analysis.get('space_complexity', 'N/A')}"
-    )
-
-    add_text(
-        "Optimization Notes: "
-        + analysis.get(
-            "optimization_notes",
-            "None"
-        )
-    )
-
-
-    add_title(
-        "4. Corrected & Annotated Code:"
-    )
-
-    add_text(
-        analysis.get(
-            "corrected_code",
-            ""
-        )
+    st.info(
+        "Safety mode enabled: this version does NOT execute submitted code "
+        "and does NOT use the public Piston API."
     )
 
 
-    return bytes(
-        pdf.output()
+# ============================================================
+# HERO
+# ============================================================
+st.markdown("""
+<div class="hero">
+    <h1>💻 CodeSense AI</h1>
+    <p>
+        Intelligent source-code analysis, error explanation,
+        correction, annotation, TC/SC analysis and professional reporting.
+    </p>
+</div>
+""", unsafe_allow_html=True)
+
+
+# ============================================================
+# MAIN WORKSPACE
+# ============================================================
+left, right = st.columns([1, 1.08], gap="large")
+
+
+with left:
+    st.markdown("### 🧑‍💻 Code Workspace")
+
+    language = st.selectbox(
+        "Programming Language",
+        ["Python", "C++", "Java"],
+        index=["Python", "C++", "Java"].index(st.session_state.language),
     )
 
-
-# ==========================================
-# 8. SIDEBAR
-# ==========================================
-
-st.sidebar.title(
-    "AI Code Annotator"
-)
-
-st.sidebar.markdown(
-    "*Powered by Groq GPT-OSS 120B*"
-)
-
-st.sidebar.success(
-    "AI API successfully loaded."
-)
-
-
-# ==========================================
-# 9. MAIN COLUMNS
-# ==========================================
-
-col_left, col_right = st.columns(
-    2
-)
-
-
-# ==========================================
-# 10. INPUT WORKSPACE
-# ==========================================
-
-with col_left:
-
-    st.header(
-        "1. Input Workspace"
+    code = st.text_area(
+        "Write or paste your code",
+        value=st.session_state.code,
+        height=550,
+        placeholder=(
+            "Example C++:\n\n"
+            "#include <iostream>\n"
+            "using namespace std;\n\n"
+            "int main() {\n"
+            "    int a = 10\n"
+            "    cout << a;\n"
+            "    return 0;\n"
+            "}"
+        ),
     )
 
-
-    language_choice = st.selectbox(
-        "Select Language",
-        [
-            "Python",
-            "C++",
-            "Java"
-        ]
+    st.caption(
+        "The application analyzes your source code. It does not compile "
+        "or execute it."
     )
-
-
-    user_code = st.text_area(
-        "Write or Paste your code here:",
-        height=500,
-        placeholder="Enter your code here..."
-    )
-
-
-    # Program input
-
-    program_input = st.text_area(
-        "Program Input (optional):",
-        height=100,
-        placeholder="Enter input for your program here..."
-    )
-
 
     if st.button(
-        "Analyze & Annotate Code",
-        type="primary"
+        "🔍 Analyze & Annotate Code",
+        type="primary",
+        use_container_width=True,
     ):
-
-        if not user_code.strip():
-
-            st.warning(
-                "Please enter some code to analyze."
-            )
-
+        if not code.strip():
+            st.warning("Please enter some code.")
         else:
+            st.session_state.code = code
+            st.session_state.language = language
 
-            with st.spinner(
-                "Analyzing code using Groq AI..."
-            ):
+            with st.spinner("Checking syntax and asking AI to analyze the code..."):
+                local_checks = local_static_analysis(code, language)
+                result = analyze_with_groq(code, language, local_checks)
 
-                result = get_groq_analysis(
-                    api_key,
-                    user_code,
-                    language_choice
-                )
-
-
-                if "error" in result:
-
-                    st.error(
-                        f"API Error: {result['error']}"
-                    )
-
-                else:
-
-                    st.session_state.analysis_result = result
-
-                    st.session_state.original_code = user_code
-
-                    st.session_state.selected_lang = language_choice
-
-                    st.success(
-                        "Analysis Complete!"
-                    )
+            if "error" in result:
+                st.error(f"Groq API error: {result['error']}")
+                st.session_state.result = None
+            else:
+                result = merge_errors(result, local_checks)
+                st.session_state.local_checks = local_checks
+                st.session_state.result = result
+                st.success("Analysis completed.")
 
 
-# ==========================================
-# 11. OUTPUT WORKSPACE
-# ==========================================
+with right:
+    st.markdown("### 📊 Analysis Dashboard")
 
-with col_right:
+    result = st.session_state.result
 
-    st.header(
-        "2. AI Output & Compiler"
-    )
-
-
-    if not st.session_state.analysis_result:
-
+    if result is None:
         st.info(
-            "Awaiting code input. "
-            "Click 'Analyze & Annotate Code' "
-            "on the left to see results here."
+            "Enter code and click Analyze & Annotate Code. "
+            "Your results will appear here."
         )
-
-
     else:
+        status = result.get("status", "Warnings")
 
-        res = st.session_state.analysis_result
+        if status == "Valid":
+            st.success("✅ Code analysis completed — no major problems detected.")
+        elif status == "Errors Found":
+            st.error("❌ Errors found. Review the explanations below.")
+        else:
+            st.warning("⚠️ Analysis completed with warnings.")
 
+        # Top metrics
+        m1, m2, m3, m4 = st.columns(4)
 
-        tab1, tab2, tab3 = st.tabs(
-            [
-                "Corrected Code",
-                "Analysis Report",
-                "Run Output"
-            ]
-        )
-
-
-        # ==================================
-        # CORRECTED CODE
-        # ==================================
-
-        with tab1:
-
-            st.write(
-                "### Annotated Code"
+        with m1:
+            st.markdown(
+                f'<div class="metric"><div class="metric-label">TC</div>'
+                f'<div class="metric-value">{result.get("time_complexity", "N/A")}</div></div>',
+                unsafe_allow_html=True,
             )
+
+        with m2:
+            st.markdown(
+                f'<div class="metric"><div class="metric-label">SC</div>'
+                f'<div class="metric-value">{result.get("space_complexity", "N/A")}</div></div>',
+                unsafe_allow_html=True,
+            )
+
+        with m3:
+            st.markdown(
+                f'<div class="metric"><div class="metric-label">QUALITY</div>'
+                f'<div class="metric-value">{result.get("quality_score", "N/A")}</div></div>',
+                unsafe_allow_html=True,
+            )
+
+        with m4:
+            st.markdown(
+                f'<div class="metric"><div class="metric-label">SECURITY</div>'
+                f'<div class="metric-value">{result.get("security_score", "N/A")}</div></div>',
+                unsafe_allow_html=True,
+            )
+
+        tabs = st.tabs([
+            "🚨 Errors",
+            "✨ Corrected Code",
+            "📚 Explanation",
+            "📈 TC / SC",
+            "🔐 Quality",
+            "📄 PDF",
+        ])
+
+        # ----------------------------------------------------
+        # ERRORS
+        # ----------------------------------------------------
+        with tabs[0]:
+            st.markdown("#### Detected Errors & Warnings")
+
+            errors = result.get("errors", [])
+
+            if not errors:
+                st.success("No significant problems were identified.")
+            else:
+                for item in errors:
+                    line = item.get("line", "?")
+                    severity = item.get("severity", "Warning")
+                    title = item.get("title", "Issue")
+
+                    icon = "🚨" if severity == "Error" else "⚠️"
+
+                    with st.expander(
+                        f"{icon} Line {line} — {severity}: {title}",
+                        expanded=True,
+                    ):
+                        st.markdown("**Why does this happen?**")
+                        st.write(item.get("explanation", "N/A"))
+
+                        st.markdown("**How do I fix it?**")
+                        st.success(item.get("fix", "N/A"))
+
+            st.markdown("#### Local Static Checks")
+
+            for item in st.session_state.local_checks:
+                if item["severity"] == "error":
+                    st.error(
+                        f"Line {item.get('line', '?')}: "
+                        f"{item['title']} — {item['message']}"
+                    )
+                elif item["severity"] == "warning":
+                    st.warning(
+                        f"Line {item.get('line', '?')}: "
+                        f"{item['title']} — {item['message']}"
+                    )
+                else:
+                    st.success(item["message"])
+
+        # ----------------------------------------------------
+        # CORRECTED CODE
+        # ----------------------------------------------------
+        with tabs[1]:
+            st.markdown("#### ✨ Corrected & Annotated Code")
+
+            corrected = result.get("corrected_code", "")
 
             st.code(
-                res.get(
-                    "corrected_code",
-                    ""
-                ),
-                language=(
-                    st.session_state.selected_lang.lower()
-                )
-            )
-
-
-        # ==================================
-        # ANALYSIS REPORT
-        # ==================================
-
-        with tab2:
-
-            st.write(
-                "### Corrections Made"
+                corrected,
+                language=language.lower(),
             )
 
             st.info(
-                res.get(
-                    "syntax_corrections",
-                    ""
+                "The corrected version is generated for review. "
+                "This application intentionally does not execute it."
+            )
+
+        # ----------------------------------------------------
+        # EXPLANATION
+        # ----------------------------------------------------
+        with tabs[2]:
+            st.markdown("#### 📝 What Does This Code Do?")
+            st.write(result.get("program_summary", "N/A"))
+
+            st.markdown("#### 🎓 Learning Takeaway")
+            st.info(result.get("learning_notes", "N/A"))
+
+        # ----------------------------------------------------
+        # COMPLEXITY
+        # ----------------------------------------------------
+        with tabs[3]:
+            c1, c2 = st.columns(2)
+
+            with c1:
+                st.markdown("### ⏱️ Time Complexity")
+                st.metric("TC", result.get("time_complexity", "N/A"))
+                st.write(result.get("time_explanation", "N/A"))
+
+            with c2:
+                st.markdown("### 💾 Space Complexity")
+                st.metric("SC", result.get("space_complexity", "N/A"))
+                st.write(result.get("space_explanation", "N/A"))
+
+            st.markdown("### 📈 Complexity Visualization")
+            fig = complexity_graph(result.get("time_complexity", "O(n)"))
+            st.pyplot(fig)
+            plt.close(fig)
+
+        # ----------------------------------------------------
+        # QUALITY
+        # ----------------------------------------------------
+        with tabs[4]:
+            q1, q2 = st.columns(2)
+
+            with q1:
+                st.metric(
+                    "Code Quality",
+                    f'{result.get("quality_score", 0)}/100'
                 )
-            )
+                st.write(result.get("quality_reason", "N/A"))
 
-
-            st.write(
-                "### Complexity Metrics"
-            )
-
-
-            col_met1, col_met2 = st.columns(
-                2
-            )
-
-
-            col_met1.metric(
-                "Time Complexity",
-                res.get(
-                    "time_complexity",
-                    "N/A"
+            with q2:
+                st.metric(
+                    "Security",
+                    f'{result.get("security_score", 0)}/100'
                 )
-            )
+                st.write(result.get("security_notes", "N/A"))
 
+            st.markdown("### 🚀 Optimization Suggestions")
+            st.success(result.get("optimization_notes", "N/A"))
 
-            col_met2.metric(
-                "Space Complexity",
-                res.get(
-                    "space_complexity",
-                    "N/A"
-                )
-            )
-
-
-            st.write(
-                "### Optimization Notes"
-            )
-
-            st.success(
-                res.get(
-                    "optimization_notes",
-                    ""
-                )
-            )
-
-
-            if res.get(
-                "time_complexity"
-            ):
-
-                st.write(
-                    "### Complexity Graph"
-                )
-
-                fig = plot_complexity(
-                    res.get(
-                        "time_complexity"
-                    )
-                )
-
-                st.pyplot(
-                    fig
-                )
-
-                plt.close(fig)
-
-
-            st.write(
-                "---"
-            )
-
+        # ----------------------------------------------------
+        # PDF
+        # ----------------------------------------------------
+        with tabs[5]:
+            st.markdown("### 📄 Professional Analysis Report")
 
             pdf_bytes = generate_pdf(
-                st.session_state.original_code,
-                st.session_state.selected_lang,
-                res
+                st.session_state.code,
+                st.session_state.language,
+                result,
             )
 
+            st.success("Your complete report is ready.")
 
             st.download_button(
-                label="📥 Download Full PDF Report",
+                "📥 Download Full PDF Report",
                 data=pdf_bytes,
-                file_name="Code_Analysis_Report.pdf",
-                mime="application/pdf"
+                file_name="CodeSense_AI_Report.pdf",
+                mime="application/pdf",
+                use_container_width=True,
             )
 
 
-        # ==================================
-        # RUN OUTPUT
-        # ==================================
-
-        with tab3:
-
-            st.write(
-                f"### Console Output "
-                f"({st.session_state.selected_lang})"
-            )
-
-
-            if st.button(
-                "▶ Run Corrected Code"
-            ):
-
-                with st.spinner(
-                    "Compiling and executing..."
-                ):
-
-                    exec_output = execute_code(
-                        res.get(
-                            "corrected_code",
-                            ""
-                        ),
-                        st.session_state.selected_lang,
-                        program_input
-                    )
-
-
-                    st.text_area(
-                        "Terminal / Stdout",
-                        value=exec_output,
-                        height=300
-                    )
+# ============================================================
+# FOOTER
+# ============================================================
+st.markdown("---")
+st.caption(
+    "CodeSense AI • AI-powered static code analysis • "
+    "Python • C++ • Java • No arbitrary code execution"
+)
