@@ -1,4 +1,6 @@
 streamlit>=1.45
 groq>=0.30
 requests>=2.31
+matplotlib>=3.8
+numpy>=1.26
 fpdf2>=2.8
