@@ -18,3 +18,5 @@ Project Title: AI Code Annotator & Web Compiler
 ​Analysis Phase: A strictly prompted API call is sent to Groq, commanding the LLM to return a formatted JSON object containing the corrected code, a list of syntax fixes, and complexity metrics.
 ​Execution Phase: The app writes the AI-corrected code to a temporary system directory, uses native system compilers (g++, javac, or Python's exec) to run the file, and captures the standard output/errors.
 ​Output Phase: The right-hand dashboard populates with three interactive tabs: the newly annotated code, the analytical report (including the plotted complexity graph), and the terminal execution output.
+app:-
+https://zomatofeedshunger.streamlit.app/
