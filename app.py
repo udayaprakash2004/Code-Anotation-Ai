@@ -1,8 +1,7 @@
 import streamlit as st
 import os
 import json
-import subprocess
-import tempfile
+import requests
 import matplotlib.pyplot as plt
 import numpy as np
 from io import StringIO
@@ -12,7 +11,7 @@ from fpdf import FPDF
 
 
 # ==========================================
-# 1. PAGE SETUP & SECURITY
+# 1. PAGE SETUP
 # ==========================================
 
 st.set_page_config(
@@ -22,7 +21,7 @@ st.set_page_config(
 
 
 # ==========================================
-# 2. GROQ API KEY
+# 2. API KEYS
 # ==========================================
 
 try:
@@ -30,8 +29,8 @@ try:
 
 except KeyError:
     st.error(
-        "API Key not found. Please configure GROQ_API_KEY "
-        "in Streamlit Cloud Secrets."
+        "GROQ_API_KEY not found. "
+        "Please add it in Streamlit Cloud → Settings → Secrets."
     )
     st.stop()
 
@@ -51,14 +50,10 @@ if "selected_lang" not in st.session_state:
 
 
 # ==========================================
-# 4. GROQ AI CODE ANALYSIS
+# 4. GROQ AI ANALYSIS
 # ==========================================
 
 def get_groq_analysis(api_key, code, language):
-    """
-    Uses Groq AI to analyze, correct, annotate,
-    and optimize the submitted code.
-    """
 
     client = Groq(api_key=api_key)
 
@@ -91,7 +86,7 @@ The JSON must contain EXACTLY these five keys:
     "syntax_corrections": "Explain syntax, indentation, and logical corrections",
     "time_complexity": "Example: O(n)",
     "space_complexity": "Example: O(1)",
-    "optimization_notes": "Explain possible optimization improvements"
+    "optimization_notes": "Explain optimization improvements"
 }}
 
 Do NOT return Markdown.
@@ -108,7 +103,7 @@ Code:
 
     try:
 
-        chat_completion = client.chat.completions.create(
+        response = client.chat.completions.create(
             model="openai/gpt-oss-120b",
 
             messages=[
@@ -125,7 +120,7 @@ Code:
             }
         )
 
-        response_text = chat_completion.choices[0].message.content
+        response_text = response.choices[0].message.content
 
         response_text = (
             response_text
@@ -134,9 +129,7 @@ Code:
             .strip()
         )
 
-        result = json.loads(response_text)
-
-        return result
+        return json.loads(response_text)
 
     except Exception as e:
 
@@ -146,72 +139,304 @@ Code:
 
 
 # ==========================================
-# 5. CODE EXECUTION
+# 5. PISTON CODE EXECUTION
 # ==========================================
 
-def execute_code(code, language):
-    """
-    Executes Python code.
+PISTON_URL = "https://emkc.org/api/v2/piston"
 
-    Java and C++ execution are disabled on Streamlit Cloud
-    because javac and g++ are not guaranteed to be installed.
+
+def get_piston_runtime(language):
+
+    """
+    Gets an available Piston runtime for the selected language.
+    """
+
+    language_map = {
+        "Python": ["python", "py", "python3"],
+        "C++": ["c++", "cpp"],
+        "Java": ["java"]
+    }
+
+    requested_names = language_map.get(language, [])
+
+    try:
+
+        response = requests.get(
+            f"{PISTON_URL}/runtimes",
+            timeout=10
+        )
+
+        response.raise_for_status()
+
+        runtimes = response.json()
+
+        for runtime in runtimes:
+
+            runtime_language = runtime.get(
+                "language",
+                ""
+            ).lower()
+
+            aliases = [
+                str(alias).lower()
+                for alias in runtime.get(
+                    "aliases",
+                    []
+                )
+            ]
+
+            if (
+                runtime_language in requested_names
+                or any(
+                    name in aliases
+                    for name in requested_names
+                )
+            ):
+
+                return {
+                    "language": runtime["language"],
+                    "version": runtime["version"]
+                }
+
+        return None
+
+    except Exception as e:
+
+        return {
+            "error": str(e)
+        }
+
+
+def execute_code(code, language, stdin=""):
+
+    """
+    Executes Python, C++, and Java code using
+    the Piston code execution API.
     """
 
     # --------------------------------------
-    # PYTHON
+    # Get runtime
+    # --------------------------------------
+
+    runtime = get_piston_runtime(language)
+
+    if runtime is None:
+
+        return (
+            "Execution Error:\n"
+            f"No Piston runtime found for {language}."
+        )
+
+    if "error" in runtime:
+
+        return (
+            "Execution Service Error:\n"
+            + runtime["error"]
+        )
+
+
+    # --------------------------------------
+    # File names
     # --------------------------------------
 
     if language == "Python":
 
-        output = StringIO()
-
-        try:
-
-            with contextlib.redirect_stdout(output):
-
-                exec(code, {})
-
-            result = output.getvalue()
-
-            if not result:
-                return "Program executed successfully with no output."
-
-            return result
-
-        except Exception as e:
-
-            return f"Python Execution Error:\n{e}"
-
-
-    # --------------------------------------
-    # C++
-    # --------------------------------------
+        filename = "main.py"
 
     elif language == "C++":
 
-        return (
-            "C++ execution is not available on Streamlit Cloud.\n\n"
-            "The AI successfully corrected and annotated your C++ code.\n\n"
-            "Copy the corrected code and run it using a C++ compiler "
-            "such as Visual Studio, Code::Blocks, MinGW, or an online compiler."
-        )
-
-
-    # --------------------------------------
-    # JAVA
-    # --------------------------------------
+        filename = "main.cpp"
 
     elif language == "Java":
 
-        return (
-            "Java execution is not available on Streamlit Cloud.\n\n"
-            "The AI successfully corrected and annotated your Java code.\n\n"
-            "Copy the corrected code and run it using a Java JDK "
-            "or an online Java compiler."
+        filename = "Main.java"
+
+    else:
+
+        return "Unsupported programming language."
+
+
+    # --------------------------------------
+    # Request payload
+    # --------------------------------------
+
+    payload = {
+        "language": runtime["language"],
+        "version": runtime["version"],
+
+        "files": [
+            {
+                "name": filename,
+                "content": code
+            }
+        ],
+
+        "stdin": stdin,
+
+        "args": [],
+
+        "compile_timeout": 10000,
+
+        "run_timeout": 5000,
+
+        "compile_cpu_time": 10000,
+
+        "run_cpu_time": 5000
+    }
+
+
+    # --------------------------------------
+    # Execute
+    # --------------------------------------
+
+    try:
+
+        response = requests.post(
+            f"{PISTON_URL}/execute",
+            json=payload,
+            timeout=20
+        )
+
+        if response.status_code != 200:
+
+            return (
+                "Execution API Error:\n"
+                f"HTTP {response.status_code}\n\n"
+                f"{response.text}"
+            )
+
+        result = response.json()
+
+
+        # --------------------------------------
+        # Compilation result
+        # --------------------------------------
+
+        compile_result = result.get(
+            "compile"
+        )
+
+        if compile_result:
+
+            compile_stderr = compile_result.get(
+                "stderr",
+                ""
+            )
+
+            compile_stdout = compile_result.get(
+                "stdout",
+                ""
+            )
+
+            compile_code = compile_result.get(
+                "code"
+            )
+
+            if (
+                compile_code not in [0, None]
+                or compile_stderr.strip()
+            ):
+
+                output = "Compilation Error:\n\n"
+
+                if compile_stderr:
+
+                    output += compile_stderr
+
+                if compile_stdout:
+
+                    output += "\n" + compile_stdout
+
+                return output
+
+
+        # --------------------------------------
+        # Run result
+        # --------------------------------------
+
+        run_result = result.get(
+            "run"
+        )
+
+        if not run_result:
+
+            return "No execution result was returned."
+
+
+        stdout = run_result.get(
+            "stdout",
+            ""
+        )
+
+        stderr = run_result.get(
+            "stderr",
+            ""
+        )
+
+        exit_code = run_result.get(
+            "code"
         )
 
 
-    return "Unsupported programming language."
+        # --------------------------------------
+        # Runtime error
+        # --------------------------------------
+
+        if (
+            exit_code not in [0, None]
+            or stderr.strip()
+        ):
+
+            output = ""
+
+            if stdout:
+
+                output += stdout
+
+            if stderr:
+
+                output += "\n\nRuntime Error:\n"
+                output += stderr
+
+            if not output:
+
+                output = "Program terminated with an error."
+
+            return output
+
+
+        # --------------------------------------
+        # Successful output
+        # --------------------------------------
+
+        if stdout:
+
+            return stdout
+
+        return "Program executed successfully with no output."
+
+
+    except requests.exceptions.Timeout:
+
+        return (
+            "Execution timed out.\n"
+            "The program took too long to compile or run."
+        )
+
+    except requests.exceptions.RequestException as e:
+
+        return (
+            "Connection error while contacting "
+            "the code execution service:\n"
+            f"{e}"
+        )
+
+    except Exception as e:
+
+        return (
+            "Unexpected execution error:\n"
+            f"{e}"
+        )
 
 
 # ==========================================
@@ -219,15 +444,20 @@ def execute_code(code, language):
 # ==========================================
 
 def plot_complexity(time_complex):
-    """
-    Creates a visual graph for common time complexities.
-    """
 
-    fig, ax = plt.subplots(figsize=(5, 3))
+    fig, ax = plt.subplots(
+        figsize=(5, 3)
+    )
 
-    n = np.linspace(1, 10, 100)
+    n = np.linspace(
+        1,
+        10,
+        100
+    )
 
-    complexity = str(time_complex).lower()
+    complexity = str(
+        time_complex
+    ).lower()
 
     complexity = (
         complexity
@@ -241,36 +471,29 @@ def plot_complexity(time_complex):
 
         y = np.ones_like(n)
 
-
     elif "o(logn)" in complexity:
 
         y = np.log(n)
-
 
     elif "o(nlogn)" in complexity:
 
         y = n * np.log(n)
 
-
     elif "o(n^2)" in complexity:
 
         y = n ** 2
-
 
     elif "o(n^3)" in complexity:
 
         y = n ** 3
 
-
     elif "o(2^n)" in complexity:
 
         y = 2 ** n
 
-
     elif "o(n)" in complexity:
 
         y = n
-
 
     else:
 
@@ -301,13 +524,14 @@ def plot_complexity(time_complex):
 
 
 # ==========================================
-# 7. PDF REPORT GENERATION
+# 7. PDF GENERATION
 # ==========================================
 
-def generate_pdf(original, language, analysis):
-    """
-    Generates a downloadable PDF analysis report.
-    """
+def generate_pdf(
+    original,
+    language,
+    analysis
+):
 
     pdf = FPDF()
 
@@ -318,10 +542,6 @@ def generate_pdf(original, language, analysis):
         size=12
     )
 
-
-    # --------------------------------------
-    # Helper: Title
-    # --------------------------------------
 
     def add_title(text):
 
@@ -345,15 +565,14 @@ def generate_pdf(original, language, analysis):
         )
 
 
-    # --------------------------------------
-    # Helper: Text
-    # --------------------------------------
-
     def add_text(text):
 
         safe_text = (
             str(text)
-            .encode("latin-1", "replace")
+            .encode(
+                "latin-1",
+                "replace"
+            )
             .decode("latin-1")
         )
 
@@ -365,10 +584,6 @@ def generate_pdf(original, language, analysis):
 
         pdf.ln(5)
 
-
-    # --------------------------------------
-    # Main Title
-    # --------------------------------------
 
     pdf.set_font(
         "Arial",
@@ -387,10 +602,6 @@ def generate_pdf(original, language, analysis):
     pdf.ln(10)
 
 
-    # --------------------------------------
-    # Original Code
-    # --------------------------------------
-
     add_title(
         "1. Original Code:"
     )
@@ -399,10 +610,6 @@ def generate_pdf(original, language, analysis):
         original
     )
 
-
-    # --------------------------------------
-    # Corrections
-    # --------------------------------------
 
     add_title(
         "2. Syntax & Indentation Corrections:"
@@ -415,10 +622,6 @@ def generate_pdf(original, language, analysis):
         )
     )
 
-
-    # --------------------------------------
-    # Complexity
-    # --------------------------------------
 
     add_title(
         "3. Complexity Analysis:"
@@ -440,10 +643,6 @@ def generate_pdf(original, language, analysis):
         )
     )
 
-
-    # --------------------------------------
-    # Corrected Code
-    # --------------------------------------
 
     add_title(
         "4. Corrected & Annotated Code:"
@@ -475,12 +674,12 @@ st.sidebar.markdown(
 )
 
 st.sidebar.success(
-    "API Key successfully loaded from Secrets."
+    "AI API successfully loaded."
 )
 
 
 # ==========================================
-# 9. MAIN LAYOUT
+# 9. MAIN COLUMNS
 # ==========================================
 
 col_left, col_right = st.columns(
@@ -516,6 +715,15 @@ with col_left:
     )
 
 
+    # Program input
+
+    program_input = st.text_area(
+        "Program Input (optional):",
+        height=100,
+        placeholder="Enter input for your program here..."
+    )
+
+
     if st.button(
         "Analyze & Annotate Code",
         type="primary"
@@ -540,20 +748,11 @@ with col_left:
                 )
 
 
-                # --------------------------------------
-                # API ERROR
-                # --------------------------------------
-
                 if "error" in result:
 
                     st.error(
                         f"API Error: {result['error']}"
                     )
-
-
-                # --------------------------------------
-                # SUCCESS
-                # --------------------------------------
 
                 else:
 
@@ -569,7 +768,7 @@ with col_left:
 
 
 # ==========================================
-# 11. AI OUTPUT
+# 11. OUTPUT WORKSPACE
 # ==========================================
 
 with col_right:
@@ -579,10 +778,6 @@ with col_right:
     )
 
 
-    # --------------------------------------
-    # No Result
-    # --------------------------------------
-
     if not st.session_state.analysis_result:
 
         st.info(
@@ -591,10 +786,6 @@ with col_right:
             "on the left to see results here."
         )
 
-
-    # --------------------------------------
-    # Result Available
-    # --------------------------------------
 
     else:
 
@@ -611,7 +802,7 @@ with col_right:
 
 
         # ==================================
-        # TAB 1: CORRECTED CODE
+        # CORRECTED CODE
         # ==================================
 
         with tab1:
@@ -620,22 +811,19 @@ with col_right:
                 "### Annotated Code"
             )
 
-            language = (
-                st.session_state.selected_lang
-                .lower()
-            )
-
             st.code(
                 res.get(
                     "corrected_code",
                     ""
                 ),
-                language=language
+                language=(
+                    st.session_state.selected_lang.lower()
+                )
             )
 
 
         # ==================================
-        # TAB 2: ANALYSIS REPORT
+        # ANALYSIS REPORT
         # ==================================
 
         with tab2:
@@ -647,7 +835,7 @@ with col_right:
             st.info(
                 res.get(
                     "syntax_corrections",
-                    "No corrections provided."
+                    ""
                 )
             )
 
@@ -687,14 +875,10 @@ with col_right:
             st.success(
                 res.get(
                     "optimization_notes",
-                    "No optimization notes provided."
+                    ""
                 )
             )
 
-
-            # --------------------------------------
-            # Complexity Graph
-            # --------------------------------------
 
             if res.get(
                 "time_complexity"
@@ -704,31 +888,23 @@ with col_right:
                     "### Complexity Graph"
                 )
 
-
                 fig = plot_complexity(
                     res.get(
                         "time_complexity"
                     )
                 )
 
-
                 st.pyplot(
                     fig
                 )
 
+                plt.close(fig)
 
-                plt.close(
-                    fig
-                )
-
-
-            # --------------------------------------
-            # PDF
-            # --------------------------------------
 
             st.write(
                 "---"
             )
+
 
             pdf_bytes = generate_pdf(
                 st.session_state.original_code,
@@ -746,7 +922,7 @@ with col_right:
 
 
         # ==================================
-        # TAB 3: RUN OUTPUT
+        # RUN OUTPUT
         # ==================================
 
         with tab3:
@@ -762,7 +938,7 @@ with col_right:
             ):
 
                 with st.spinner(
-                    "Executing..."
+                    "Compiling and executing..."
                 ):
 
                     exec_output = execute_code(
@@ -770,7 +946,8 @@ with col_right:
                             "corrected_code",
                             ""
                         ),
-                        st.session_state.selected_lang
+                        st.session_state.selected_lang,
+                        program_input
                     )
 
 
