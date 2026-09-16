@@ -102,35 +102,69 @@ st.markdown(
         padding: 0 22px 24px 22px;
     }
 
-    /* Official-looking compact header */
-    .brand-bar {
-        margin: 0 -22px 10px -22px;
-        min-height: 82px;
-        padding: 8px 26px;
+    /* Official product header */
+    .brand-shell {
+        margin: 0 -22px 12px -22px;
+        min-height: 84px;
+        padding: 8px 28px;
         background: #ffffff;
-        color: var(--ink);
-        border-bottom: 1px solid #dde5ef;
-        box-shadow: 0 2px 12px rgba(15,31,61,.05);
+        border-bottom: 1px solid #dbe4ef;
+        box-shadow: 0 3px 14px rgba(15,31,61,.06);
         display: flex;
         align-items: center;
+        justify-content: space-between;
+        gap: 24px;
+    }
+
+    .brand-left {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        min-width: 0;
     }
 
     .brand-logo {
         display: block;
-        width: 250px;
-        height: 66px;
+        width: 150px;
+        height: 68px;
         object-fit: contain;
-        object-position: left center;
+        object-position: center;
         background: #fff;
+        flex: 0 0 auto;
+    }
+
+    .brand-copy {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        min-width: 0;
+    }
+
+    .brand-title {
+        font-size: 26px;
+        line-height: 1.05;
+        font-weight: 800;
+        letter-spacing: -.45px;
+        color: #0f1f3d;
+        white-space: nowrap;
+    }
+
+    .brand-subtitle {
+        margin-top: 4px;
+        font-size: 12px;
+        font-weight: 650;
+        color: #4171b7;
     }
 
     .brand-nav {
-        justify-content: flex-end;
-        gap: 22px;
+        display: flex;
+        align-items: center;
+        gap: 24px;
         font-size: 12px;
-        font-weight: 700;
-        color: #334155;
+        font-weight: 750;
+        color: #24385b;
         white-space: nowrap;
+        flex: 0 0 auto;
     }
 
     .brand-nav span {
@@ -157,6 +191,75 @@ st.markdown(
         font-size: 13px;
         font-weight: 800;
         color: #22314d;
+    }
+
+    .section-card {
+        background: #ffffff;
+        border: 1px solid #dce4ef;
+        border-radius: 10px;
+        box-shadow: 0 5px 18px rgba(20,30,50,.045);
+        overflow: hidden;
+        margin-top: 14px;
+    }
+
+    .section-head {
+        padding: 12px 15px;
+        border-bottom: 1px solid #e8edf3;
+        color: #173a8f;
+        font-size: 14px;
+        font-weight: 800;
+        background: linear-gradient(90deg, #f7faff, #ffffff);
+    }
+
+    .section-body {
+        padding: 14px;
+        color: #344054;
+        font-size: 12px;
+        line-height: 1.6;
+    }
+
+    .feature-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 9px;
+        border-radius: 999px;
+        background: #eaf2ff;
+        color: #1e4fa5;
+        font-size: 10px;
+        font-weight: 800;
+        border: 1px solid #cfe0ff;
+        margin-bottom: 9px;
+    }
+
+    .complexity-panel {
+        background: #ffffff;
+        border: 1px solid #cfdbeb;
+        border-radius: 10px;
+        box-shadow: 0 7px 20px rgba(22, 58, 100, .07);
+        overflow: hidden;
+    }
+
+    .complexity-head {
+        padding: 11px 13px;
+        border-bottom: 1px solid #e6edf6;
+        background: linear-gradient(90deg, #eef5ff, #ffffff);
+        color: #173a8f;
+        font-size: 13px;
+        font-weight: 800;
+    }
+
+    .complexity-body {
+        padding: 10px;
+    }
+
+    .always-visible-label {
+        margin-top: 4px;
+        margin-bottom: 8px;
+        color: #173a8f;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: .15px;
+        text-transform: uppercase;
     }
 
     .summary-grid {
@@ -375,14 +478,24 @@ st.markdown(
     }
 
     @media (max-width: 900px) {
+        .brand-shell {
+            align-items: flex-start;
+            flex-direction: column;
+            gap: 8px;
+            padding: 10px 18px;
+        }
+        .brand-nav {
+            gap: 14px;
+            align-self: flex-start;
+        }
+        .brand-title {
+            font-size: 22px;
+        }
         .summary-grid {
             grid-template-columns: repeat(2, 1fr);
         }
-        .brand-nav {
-            text-align: left;
-            padding-top: 2px;
-        }
     }
+
     </style>
     """,
     unsafe_allow_html=True,
@@ -403,38 +516,43 @@ def load_logo_data_uri(path):
 
 logo_uri = load_logo_data_uri(LOGO_PATH)
 
-left_brand, right_brand = st.columns([2.1, 1.0], gap="small")
-with left_brand:
-    if logo_uri:
-        st.markdown(
-            f"""
-            <div class="brand-bar">
+if logo_uri:
+    st.markdown(
+        f"""
+        <div class="brand-shell">
+            <div class="brand-left">
                 <img class="brand-logo" src="{logo_uri}" alt="Code Annotation Ai logo">
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-    else:
-        st.markdown(
-            f"""
-            <div class="brand-bar">
-                <div>
-                    <div style="font-size:26px;font-weight:800;color:#0f1f3d;">{APP_TITLE}</div>
-                    <div style="font-size:12px;font-weight:650;color:#4b6ea8;">{APP_SUBTITLE}</div>
+                <div class="brand-copy">
+                    <div class="brand-title">Code Annotation Ai</div>
+                    <div class="brand-subtitle">a web-compiler</div>
                 </div>
             </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-with right_brand:
+            <div class="brand-nav">
+                <span>Home</span>
+                <span>Analyze</span>
+                <span>Run</span>
+                <span>Report</span>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+else:
     st.markdown(
         """
-        <div class="brand-bar brand-nav">
-            <span>Home</span>
-            <span>Analyze</span>
-            <span>Run</span>
-            <span>Report</span>
+        <div class="brand-shell">
+            <div class="brand-left">
+                <div class="brand-copy">
+                    <div class="brand-title">Code Annotation Ai</div>
+                    <div class="brand-subtitle">a web-compiler</div>
+                </div>
+            </div>
+            <div class="brand-nav">
+                <span>Home</span>
+                <span>Analyze</span>
+                <span>Run</span>
+                <span>Report</span>
+            </div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -1356,10 +1474,10 @@ if clear_button:
 
 
 # ============================================================
-# Editor + analysis summary
+# Editor + analysis summary + always-visible complexity graphs
 # ============================================================
 
-left, right = st.columns([1.18, 0.82], gap="medium")
+left, right = st.columns([1.08, 0.92], gap="medium")
 
 with left:
     st.markdown('<div class="card-title">Code Editor</div>', unsafe_allow_html=True)
@@ -1382,7 +1500,10 @@ with left:
         source = st.session_state.source_code
     st.session_state.source_code = source
 
-    st.markdown('<div class="toolbar-label" style="margin-top:10px;">Custom Input (stdin)</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="toolbar-label" style="margin-top:9px;">Custom Input (stdin)</div>',
+        unsafe_allow_html=True,
+    )
     stdin_text = st.text_area(
         "stdin",
         value=st.session_state.stdin_text,
@@ -1444,14 +1565,41 @@ with right:
     elif result:
         st.markdown(
             '<div class="issue-box"><div class="line" style="color:#149447;">No blocking errors found.</div>'
-            "Review the analysis tabs for quality, optimization, security, and complexity feedback.</div>",
+            "Review the sections below for code quality, complexity, optimization, and security.</div>",
             unsafe_allow_html=True,
         )
     else:
         st.markdown(
-            '<div class="issue-box">Analyze the code to receive syntax, logic, complexity, optimization, and security feedback.</div>',
+            '<div class="issue-box">Analyze the code to populate the dashboard and complexity graphs.</div>',
             unsafe_allow_html=True,
         )
+
+    # Highlight feature: graphs are always visible beside the user's code.
+    st.markdown(
+        '<div class="always-visible-label">Complexity Visualizer — always visible</div>',
+        unsafe_allow_html=True,
+    )
+    graph_left, graph_right = st.columns(2, gap="small")
+
+    with graph_left:
+        st.markdown(
+            '<div class="complexity-panel"><div class="complexity-head">Time Complexity</div><div class="complexity-body">',
+            unsafe_allow_html=True,
+        )
+        time_expression = result.get("time_complexity", "N/A") if result else "N/A"
+        st.metric("Big-O", time_expression)
+        show_complexity_plot("Time Complexity Growth", time_expression)
+        st.markdown("</div></div>", unsafe_allow_html=True)
+
+    with graph_right:
+        st.markdown(
+            '<div class="complexity-panel"><div class="complexity-head">Space Complexity</div><div class="complexity-body">',
+            unsafe_allow_html=True,
+        )
+        space_expression = result.get("space_complexity", "N/A") if result else "N/A"
+        st.metric("Big-O", space_expression)
+        show_complexity_plot("Space Complexity Growth", space_expression)
+        st.markdown("</div></div>", unsafe_allow_html=True)
 
 
 # ============================================================
@@ -1471,111 +1619,115 @@ if analyze_button:
 
 
 # ============================================================
-# Result tabs
+# Always-visible AI result sections
 # ============================================================
 
 result = st.session_state.analysis
 
 if result:
-    tabs = st.tabs(
-        [
-            "Corrected Code",
-            "Explanation",
-            "Time & Space Complexity",
-            "Optimization",
-            "Security",
-            "Notes",
-        ]
+    corrected = result.get("corrected_code", source)
+
+    st.markdown(
+        '<div class="section-card"><div class="section-head">1. Corrected Code</div><div class="section-body">',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '<div class="feature-badge">MAIN OUTPUT</div>',
+        unsafe_allow_html=True,
+    )
+    st.code(corrected, language=selected_language.lower())
+    st.download_button(
+        "Download Corrected Code",
+        data=corrected,
+        file_name=f"main.{EXTENSIONS[selected_language]}",
+        mime="text/plain",
+        use_container_width=True,
+    )
+    st.markdown(
+        f'<div class="note-box" style="margin:12px 0 0 0;"><b>What does this code do?</b><br><br>{html.escape(result.get("summary", "No summary available."))}</div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown("</div></div>", unsafe_allow_html=True)
+
+    # Explanation — always visible
+    st.markdown(
+        '<div class="section-card"><div class="section-head">2. Explanation</div><div class="section-body">',
+        unsafe_allow_html=True,
+    )
+    issues = result.get("errors", []) + result.get("warnings", []) + result.get("info", [])
+    if issues:
+        for issue in issues:
+            color = (
+                "error" if issue.get("severity") == "Error"
+                else "warning" if issue.get("severity") == "Warning"
+                else "info"
+            )
+            st.markdown(
+                f"""
+                <div class="note-box" style="margin:0 0 10px 0;">
+                    <b class="{color}">Line {html.escape(str(issue.get("line", "?")))} — {html.escape(str(issue.get("title", "Issue")))}</b><br><br>
+                    <b>Explanation:</b> {html.escape(str(issue.get("explanation", "")))}<br><br>
+                    <b>Why:</b> {html.escape(str(issue.get("why", "")))}<br><br>
+                    <b>How to Fix:</b> {html.escape(str(issue.get("fix", "")))}
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+    else:
+        st.success("No significant issues were found.")
+    st.markdown("</div></div>", unsafe_allow_html=True)
+
+    # Optimization + Security + Notes — always visible
+    opt_col, sec_col, notes_col = st.columns(3, gap="medium")
+
+    with opt_col:
+        st.markdown(
+            f'<div class="section-card"><div class="section-head">3. Optimization</div><div class="section-body">{html.escape(result.get("optimization", "No optimization notes."))}</div></div>',
+            unsafe_allow_html=True,
+        )
+
+    with sec_col:
+        st.markdown(
+            f'<div class="section-card"><div class="section-head">4. Security</div><div class="section-body">{html.escape(result.get("security", "No security notes."))}</div></div>',
+            unsafe_allow_html=True,
+        )
+
+    with notes_col:
+        st.markdown(
+            f'<div class="section-card"><div class="section-head">5. Notes</div><div class="section-body">{html.escape(result.get("notes", "No notes."))}</div></div>',
+            unsafe_allow_html=True,
+        )
+
+    # Dedicated complexity explanation is visible without switching tabs.
+    tc_col, sc_col = st.columns(2, gap="medium")
+    with tc_col:
+        st.markdown(
+            f'<div class="section-card"><div class="section-head">Time Complexity Explanation</div><div class="section-body"><b>{html.escape(result.get("time_complexity", "N/A"))}</b><br><br>{html.escape(result.get("time_explanation", ""))}</div></div>',
+            unsafe_allow_html=True,
+        )
+    with sc_col:
+        st.markdown(
+            f'<div class="section-card"><div class="section-head">Space Complexity Explanation</div><div class="section-body"><b>{html.escape(result.get("space_complexity", "N/A"))}</b><br><br>{html.escape(result.get("space_explanation", ""))}</div></div>',
+            unsafe_allow_html=True,
+        )
+
+else:
+    st.markdown(
+        """
+        <div class="section-card">
+            <div class="section-head">AI Results</div>
+            <div class="section-body">
+                Analyze your code to display corrected code, explanation, optimization, security,
+                notes, and detailed complexity information. The complexity visualizer remains visible
+                beside the editor.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
-    with tabs[0]:
-        st.subheader("Corrected Code")
-        corrected = result.get("corrected_code", source)
-        st.code(corrected, language=selected_language.lower())
-        st.download_button(
-            "Download Corrected Code",
-            data=corrected,
-            file_name=f"main.{EXTENSIONS[selected_language]}",
-            mime="text/plain",
-            use_container_width=True,
-        )
 
-        st.markdown(
-            f"""
-            <div class="note-box">
-                <b>What does this code do?</b><br><br>
-                {html.escape(result.get("summary", "No summary available."))}
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-    with tabs[1]:
-        issues = (
-            result.get("errors", [])
-            + result.get("warnings", [])
-            + result.get("info", [])
-        )
-        if issues:
-            for issue in issues:
-                color = (
-                    "error" if issue.get("severity") == "Error"
-                    else "warning" if issue.get("severity") == "Warning"
-                    else "info"
-                )
-                st.markdown(
-                    f"""
-                    <div class="note-box">
-                        <b class="{color}">Line {html.escape(str(issue.get("line", "?")))} — {html.escape(str(issue.get("title", "Issue")))}</b><br><br>
-                        <b>Explanation:</b> {html.escape(str(issue.get("explanation", "")))}<br><br>
-                        <b>Why:</b> {html.escape(str(issue.get("why", "")))}<br><br>
-                        <b>How to Fix:</b> {html.escape(str(issue.get("fix", "")))}
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-        else:
-            st.success("No significant issues were found.")
-
-    with tabs[2]:
-        col_a, col_b = st.columns(2)
-        with col_a:
-            st.markdown("### Time Complexity")
-            st.metric("Complexity", result.get("time_complexity", "N/A"))
-            st.write(result.get("time_explanation", ""))
-            show_complexity_plot(
-                "Time Complexity Growth",
-                result.get("time_complexity", "N/A"),
-            )
-
-        with col_b:
-            st.markdown("### Space Complexity")
-            st.metric("Complexity", result.get("space_complexity", "N/A"))
-            st.write(result.get("space_explanation", ""))
-            show_complexity_plot(
-                "Space Complexity Growth",
-                result.get("space_complexity", "N/A"),
-            )
-
-    with tabs[3]:
-        st.markdown(
-            f'<div class="note-box">{html.escape(result.get("optimization", "No optimization notes."))}</div>',
-            unsafe_allow_html=True,
-        )
-
-    with tabs[4]:
-        st.markdown(
-            f'<div class="note-box">{html.escape(result.get("security", "No security notes."))}</div>',
-            unsafe_allow_html=True,
-        )
-
-    with tabs[5]:
-        st.markdown(
-            f'<div class="note-box">{html.escape(result.get("notes", "No notes."))}</div>',
-            unsafe_allow_html=True,
-        )
-
-    # ========================================================
+# ========================================================
     # Run / Preview section
     # ========================================================
 
@@ -1661,20 +1813,6 @@ if result:
         use_container_width=True,
     )
 
-else:
-    st.markdown(
-        """
-        <div class="note-box" style="text-align:center; margin-top:14px;">
-            Start by writing code in the editor, choose a language, then press
-            <b>Analyze</b> to generate corrected code, explanations, complexity,
-            optimization, and security feedback.
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
-# ============================================================
 # Footer
 # ============================================================
 
