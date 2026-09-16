@@ -1,537 +1,431 @@
 import ast
+import html
 import json
 import os
-import requests
 import re
-import shutil
-import subprocess
-import tempfile
 import time
+from html.parser import HTMLParser
 from pathlib import Path
 
+import matplotlib.pyplot as plt
+import numpy as np
+import requests
 import streamlit as st
-from groq import Groq
+import streamlit.components.v1 as components
 from fpdf import FPDF
+from groq import Groq
+from streamlit_ace import st_ace
 
 
-# ==========================================================
-# Code=Annotation-AI
-# ==========================================================
+# ============================================================
+# Code Annotation Ai — web-compiler / AI code reviewer
+# ============================================================
 
 st.set_page_config(
-    page_title="Code=Annotation-AI",
+    page_title="Code Annotation Ai",
     page_icon="</>",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
 
-GITHUB_URL = "https://github.com/udayaprakash2004/Code-Anotation-Ai"
+APP_TITLE = "Code Annotation Ai"
+APP_SUBTITLE = "a web-compiler"
 MAX_CODE = 30000
-TIMEOUT = 8
-
-
-# ==========================================================
-# PROFESSIONAL PURPLE UI
-# ==========================================================
-
-st.markdown("""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-
-:root {
-    --purple: #5b21b6;
-    --purple2: #6d28d9;
-    --purple3: #7c3aed;
-    --dark: #24105f;
-    --text: #202534;
-    --muted: #687386;
-    --border: #dfe3eb;
-    --green: #159447;
-    --red: #dc3038;
-    --orange: #e58a00;
-}
-
-* {
-    box-sizing: border-box;
-}
-
-html, body, [class*="css"] {
-    font-family: "Inter", "Segoe UI", Arial, sans-serif;
-}
-
-.stApp {
-    min-height: 100vh;
-    background:
-        radial-gradient(circle at 12% 20%, rgba(255,255,255,.10), transparent 20%),
-        radial-gradient(circle at 86% 10%, rgba(255,255,255,.08), transparent 22%),
-        linear-gradient(135deg, #351080 0%, #4b1499 48%, #6417a7 100%);
-}
-
-[data-testid="stHeader"] {
-    background: transparent;
-}
-
-.block-container {
-    max-width: 1460px;
-    padding: 0 24px 20px 24px;
-}
-
-header[data-testid="stHeader"] {
-    height: 0;
-}
-
-#MainMenu {
-    visibility: hidden;
-}
-
-footer {
-    visibility: hidden;
-}
-
-
-/* ---------- Header ---------- */
-
-.app-header {
-    height: 82px;
-    margin: 0 -24px 22px -24px;
-    padding: 0 34px;
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background:
-        linear-gradient(90deg, rgba(34,10,95,.96), rgba(83,22,158,.94));
-    border-bottom: 1px solid rgba(255,255,255,.16);
-    box-shadow: 0 5px 20px rgba(24, 6, 75, .25);
-}
-
-.logo {
-    font-size: 28px;
-    line-height: 1.1;
-    font-weight: 800;
-    letter-spacing: -1px;
-}
-
-.tagline {
-    margin-top: 6px;
-    font-size: 12px;
-    font-weight: 500;
-    opacity: .9;
-}
-
-.nav {
-    display: flex;
-    gap: 34px;
-    align-items: center;
-    font-size: 13px;
-    font-weight: 650;
-}
-
-.nav-item {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    opacity: .96;
-}
-
-
-/* ---------- Main white workspace ---------- */
-
-.main-card {
-    background: #f9fafc;
-    border: 1px solid rgba(255,255,255,.55);
-    border-radius: 9px;
-    box-shadow: 0 15px 40px rgba(28, 5, 75, .24);
-    padding: 18px;
-}
-
-
-/* ---------- Top controls ---------- */
-
-.control-label {
-    color: #697486;
-    font-size: 12px;
-    font-weight: 650;
-    margin: 0 0 7px 1px;
-}
-
-div[data-baseweb="select"] > div {
-    background: #ffffff !important;
-    border: 1px solid #d9dee7 !important;
-    border-radius: 6px !important;
-    min-height: 40px !important;
-    color: #273142 !important;
-    box-shadow: none !important;
-}
-
-div[data-baseweb="select"] span {
-    color: #273142 !important;
-}
-
-div[data-baseweb="select"] svg {
-    color: #455266 !important;
-}
-
-.stButton > button,
-.stDownloadButton > button {
-    min-height: 40px;
-    border-radius: 6px;
-    border: 1px solid #d9dee7;
-    background: white;
-    color: #303a4a;
-    font-size: 12px;
-    font-weight: 650;
-    box-shadow: none;
-}
-
-.stButton > button:hover,
-.stDownloadButton > button:hover {
-    border-color: #6d28d9;
-    color: #5b21b6;
-    background: #fff;
-}
-
-button[kind="primary"] {
-    background: #6023bf !important;
-    border-color: #6023bf !important;
-    color: white !important;
-}
-
-button[kind="primary"]:hover {
-    background: #4f1da1 !important;
-}
-
-
-/* ---------- Panels ---------- */
-
-.panel {
-    background: white;
-    border: 1px solid #e1e5ec;
-    border-radius: 8px;
-    box-shadow: 0 2px 9px rgba(30,40,60,.045);
-    overflow: hidden;
-}
-
-.panel-heading {
-    height: 52px;
-    display: flex;
-    align-items: center;
-    padding: 0 17px;
-    border-bottom: 1px solid #e7e9ee;
-    color: #273142;
-    font-size: 14px;
-    font-weight: 700;
-}
-
-.heading-icon {
-    color: #6b28c8;
-    margin-right: 9px;
-    font-weight: 800;
-}
-
-
-/* ---------- Editor ---------- */
-
-.stTextArea textarea {
-    background: #ffffff !important;
-    color: #17202b !important;
-    border: 1px solid #d8dee7 !important;
-    border-radius: 6px !important;
-    font-family: Consolas, "Courier New", monospace !important;
-    font-size: 13px !important;
-    line-height: 1.55 !important;
-    padding: 13px !important;
-    box-shadow: none !important;
-}
-
-.stTextArea textarea:focus {
-    border-color: #7950c8 !important;
-    box-shadow: 0 0 0 1px #7950c8 !important;
-}
-
-.stTextInput input {
-    background: white !important;
-    color: #17202b !important;
-    border: 1px solid #d8dee7 !important;
-}
-
-
-/* ---------- Summary cards ---------- */
-
-.summary-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 11px;
-    padding: 14px 14px 16px;
-}
-
-.summary-card {
-    min-height: 82px;
-    background: #fff;
-    border: 1px solid #e5e8ee;
-    border-radius: 7px;
-    padding: 12px;
-}
-
-.summary-label {
-    font-size: 11px;
-    font-weight: 600;
-    color: #707b8d;
-}
-
-.summary-value {
-    margin-top: 8px;
-    font-size: 23px;
-    font-weight: 750;
-    color: #242b39;
-}
-
-.red { color: #d83239 !important; }
-.orange { color: #dc8700 !important; }
-.blue { color: #2b6dd0 !important; }
-.green { color: #149044 !important; }
-
-
-/* ---------- Error card ---------- */
-
-.error-section {
-    border-top: 1px solid #eceef2;
-    padding: 13px 14px 16px;
-}
-
-.error-title {
-    font-size: 13px;
-    font-weight: 750;
-    color: #3b4351;
-    margin-bottom: 12px;
-}
-
-.error-card {
-    border: 1px solid #e1e4e9;
-    border-radius: 7px;
-    padding: 14px;
-    background: #fff;
-}
-
-.error-line {
-    color: #df3038;
-    font-size: 12px;
-    font-weight: 750;
-    margin-bottom: 7px;
-}
-
-.error-text {
-    color: #3c4655;
-    font-size: 12px;
-    line-height: 1.55;
-}
-
-.why {
-    color: #6c2abb;
-    font-size: 12px;
-    font-weight: 750;
-    margin-top: 13px;
-}
-
-.fix {
-    color: #159447;
-    font-size: 12px;
-    font-weight: 750;
-    margin-top: 13px;
-}
-
-
-/* ---------- Lower result section ---------- */
-
-.result-card {
-    margin-top: 16px;
-    background: white;
-    border: 1px solid #e1e5ec;
-    border-radius: 8px;
-    box-shadow: 0 2px 9px rgba(30,40,60,.045);
-    overflow: hidden;
-}
-
-.stTabs [data-baseweb="tab-list"] {
-    gap: 0;
-    border-bottom: 1px solid #e1e4ea;
-    background: white;
-}
-
-.stTabs [data-baseweb="tab"] {
-    color: #566173 !important;
-    font-size: 12px !important;
-    font-weight: 600 !important;
-    padding: 11px 17px !important;
-    background: white !important;
-    border-radius: 0 !important;
-}
-
-.stTabs [aria-selected="true"] {
-    color: #5b21b6 !important;
-    border-bottom: 2px solid #5b21b6 !important;
-}
-
-.code-box {
-    background: #fbfcfe;
-    border: 1px solid #e1e5eb;
-    border-radius: 6px;
-    padding: 2px;
-}
-
-.note-box {
-    background: #ffffff;
-    border: 1px solid #e1e5eb;
-    border-radius: 7px;
-    padding: 14px;
-    color: #364152;
-    font-size: 12px;
-    line-height: 1.6;
-}
-
-
-/* ---------- Runner ---------- */
-
-.runner {
-    border-top: 1px solid #e4e7ed;
-    padding: 16px;
-}
-
-.runner-title {
-    font-size: 14px;
-    font-weight: 750;
-    color: #2d3543;
-    margin-bottom: 13px;
-}
-
-.console {
-    background: #101010;
-    color: #52e66b;
-    min-height: 105px;
-    padding: 12px;
-    border-radius: 5px;
-    font-family: Consolas, monospace;
-    font-size: 12px;
-    white-space: pre-wrap;
-    border: 1px solid #252525;
-}
-
-.console-error {
-    color: #ff7474;
-}
-
-.runner-time {
-    text-align: right;
-    color: #677184;
-    font-size: 11px;
-    margin-top: 4px;
-}
-
-.footer-text {
-    color: rgba(255,255,255,.88);
-    text-align: center;
-    font-size: 11px;
-    padding: 17px 0 2px;
-}
-
-.footer-text a {
-    color: white;
-    font-weight: 700;
-    text-decoration: none;
-}
-
-@media (max-width: 900px) {
+JUDGE0_URL = st.secrets.get(
+    "JUDGE0_URL",
+    os.getenv("JUDGE0_URL", "https://ce.judge0.com"),
+).rstrip("/")
+JUDGE0_API_KEY = st.secrets.get(
+    "JUDGE0_API_KEY",
+    os.getenv("JUDGE0_API_KEY", ""),
+)
+GROQ_API_KEY = st.secrets.get(
+    "GROQ_API_KEY",
+    os.getenv("GROQ_API_KEY", ""),
+)
+GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
+
+
+# ============================================================
+# Global styling — clean online-compiler look
+# ============================================================
+
+st.markdown(
+    """
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+    :root {
+        --bg: #f5f7fa;
+        --surface: #ffffff;
+        --surface-2: #fbfcfe;
+        --ink: #172033;
+        --muted: #647084;
+        --border: #dfe4ec;
+        --brand: #4f46e5;
+        --brand-dark: #3730a3;
+        --success: #149447;
+        --danger: #d9343a;
+        --warning: #d98700;
+        --editor: #1f1f1f;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body, [class*="css"] {
+        font-family: "Inter", "Segoe UI", Arial, sans-serif;
+    }
+
+    .stApp {
+        background: var(--bg);
+        color: var(--ink);
+    }
+
+    header[data-testid="stHeader"] {
+        height: 0;
+        background: transparent;
+    }
+
+    #MainMenu, footer {
+        visibility: hidden;
+    }
+
+    .block-container {
+        max-width: 1400px;
+        padding: 0 22px 28px 22px;
+    }
+
+    /* Compact brand header */
+    .brand-bar {
+        margin: 0 -22px 12px -22px;
+        padding: 14px 28px 12px 28px;
+        background: linear-gradient(135deg, #23155c, #4b2aa8);
+        color: white;
+        border-bottom: 1px solid rgba(255,255,255,.15);
+    }
+
+    .brand-title {
+        font-size: 28px;
+        line-height: 1.05;
+        font-weight: 800;
+        letter-spacing: -.7px;
+        color: #fff;
+    }
+
+    .brand-subtitle {
+        margin-top: 3px;
+        font-size: 12px;
+        font-weight: 600;
+        color: rgba(255,255,255,.88);
+        letter-spacing: .2px;
+    }
+
+    .brand-nav {
+        text-align: right;
+        font-size: 12px;
+        font-weight: 600;
+        color: rgba(255,255,255,.9);
+        padding-top: 6px;
+    }
+
+    .toolbar-label {
+        font-size: 11px;
+        font-weight: 700;
+        color: #687486;
+        margin: 0 0 5px 1px;
+    }
+
+    .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        box-shadow: 0 4px 16px rgba(20, 30, 50, .05);
+    }
+
+    .card-title {
+        padding: 11px 14px;
+        border-bottom: 1px solid #eaedf2;
+        font-size: 13px;
+        font-weight: 750;
+        color: #283243;
+    }
+
+    .analysis-card {
+        padding-bottom: 2px;
+        overflow: hidden;
+    }
+
     .summary-grid {
-        grid-template-columns: repeat(2, 1fr);
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 9px;
+        padding: 11px;
     }
-    .nav {
-        display: none;
+
+    .summary-item {
+        background: #fff;
+        border: 1px solid #e6eaf0;
+        border-radius: 8px;
+        padding: 10px 11px;
+        min-height: 70px;
     }
+
+    .summary-label {
+        font-size: 10px;
+        font-weight: 700;
+        color: #718095;
+    }
+
+    .summary-value {
+        margin-top: 5px;
+        font-size: 22px;
+        line-height: 1.1;
+        font-weight: 800;
+        color: #273142;
+    }
+
+    .error { color: var(--danger); }
+    .warning { color: var(--warning); }
+    .info { color: #2162bd; }
+    .success { color: var(--success); }
+
+    .issue-box, .note-box {
+        margin: 0 11px 11px 11px;
+        padding: 12px;
+        background: #fff;
+        border: 1px solid #e5e8ee;
+        border-radius: 8px;
+        color: #364153;
+        font-size: 12px;
+        line-height: 1.55;
+    }
+
+    .issue-box .line {
+        color: var(--danger);
+        font-weight: 800;
+        margin-bottom: 5px;
+    }
+
+    .tabs-wrap {
+        margin-top: 14px;
+    }
+
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 0;
+        border-bottom: 1px solid var(--border);
+        background: white;
+    }
+
+    .stTabs [data-baseweb="tab"] {
+        color: #58667a !important;
+        font-size: 12px !important;
+        font-weight: 700 !important;
+        padding: 11px 15px !important;
+        background: white !important;
+    }
+
+    .stTabs [aria-selected="true"] {
+        color: var(--brand-dark) !important;
+        border-bottom: 2px solid var(--brand) !important;
+    }
+
+    .output-panel {
+        border: 1px solid #222;
+        border-radius: 8px;
+        overflow: hidden;
+        background: #111;
+    }
+
+    .output-head {
+        padding: 8px 11px;
+        background: #191919;
+        color: #d5d8de;
+        border-bottom: 1px solid #292929;
+        font-size: 11px;
+        font-weight: 700;
+    }
+
+    .output-body {
+        min-height: 132px;
+        padding: 12px;
+        white-space: pre-wrap;
+        color: #76e58e;
+        font: 12px/1.55 Consolas, "Courier New", monospace;
+    }
+
+    .output-error {
+        color: #ff8181 !important;
+    }
+
+    .footer {
+        padding: 18px 0 4px 0;
+        text-align: center;
+        color: #7c8798;
+        font-size: 11px;
+    }
+
+    .small-caption {
+        color: #748095;
+        font-size: 11px;
+        line-height: 1.45;
+    }
+
+    .stButton > button,
+    .stDownloadButton > button {
+        border-radius: 7px !important;
+        font-weight: 700 !important;
+        min-height: 38px !important;
+    }
+
+    .stButton > button[kind="primary"] {
+        background: var(--brand) !important;
+        border-color: var(--brand) !important;
+        color: white !important;
+    }
+
+    .stButton > button:hover,
+    .stDownloadButton > button:hover {
+        border-color: var(--brand) !important;
+    }
+
+    div[data-baseweb="select"] > div {
+        min-height: 38px !important;
+        border-radius: 7px !important;
+    }
+
+    .stTextArea textarea {
+        background: white !important;
+        color: #1e293b !important;
+        border-radius: 7px !important;
+        border: 1px solid #d9dfe8 !important;
+        font-family: Consolas, "Courier New", monospace !important;
+        font-size: 12px !important;
+    }
+
+    @media (max-width: 900px) {
+        .summary-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+        .brand-nav {
+            text-align: left;
+            padding-top: 2px;
+        }
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+
+# ============================================================
+# Branding
+# ============================================================
+
+h1, h2 = st.columns([3.3, 1])
+with h1:
+    st.markdown(
+        f"""
+        <div class="brand-bar">
+            <div class="brand-title">{APP_TITLE}</div>
+            <div class="brand-subtitle">{APP_SUBTITLE}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+with h2:
+    st.markdown(
+        """
+        <div class="brand-bar brand-nav">
+            Home&nbsp;&nbsp;&nbsp; Analyze&nbsp;&nbsp;&nbsp; Run&nbsp;&nbsp;&nbsp; Report
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+# ============================================================
+# Language definitions
+# ============================================================
+
+LANGUAGES = [
+    "C",
+    "C++",
+    "Java",
+    "Python",
+    "JavaScript",
+    "HTML",
+    "CSS",
+]
+
+ACE_MODES = {
+    "C": "c_cpp",
+    "C++": "c_cpp",
+    "Java": "java",
+    "Python": "python",
+    "JavaScript": "javascript",
+    "HTML": "html",
+    "CSS": "css",
 }
-</style>
-""", unsafe_allow_html=True)
 
+EXTENSIONS = {
+    "C": "c",
+    "C++": "cpp",
+    "Java": "java",
+    "Python": "py",
+    "JavaScript": "js",
+    "HTML": "html",
+    "CSS": "css",
+}
 
-# ==========================================================
-# HEADER
-# ==========================================================
+JUDGE0_IDS = {
+    "C": 50,
+    "C++": 54,
+    "Java": 62,
+    "Python": 71,
+    "JavaScript": 63,
+}
 
-st.markdown("""
-<div class="app-header">
-    <div>
-        <div class="logo">Code=Annotation-AI</div>
-        <div class="tagline">AI Code Analyzer, Annotator &amp; Optimizer</div>
-    </div>
-    <div class="nav">
-        <div class="nav-item">⌂ &nbsp;Home</div>
-        <div class="nav-item">▣ &nbsp;Report</div>
-        <div class="nav-item">ⓘ &nbsp;About</div>
-    </div>
-</div>
-""", unsafe_allow_html=True)
+EXAMPLES = {
+    "C": {
+        "Hello World": """#include <stdio.h>
 
-st.markdown('<div class="main-card">', unsafe_allow_html=True)
+int main(void) {
+    printf("Hello World\\n");
+    return 0;
+}""",
+        "Missing Semicolon": """#include <stdio.h>
 
+int main(void) {
+    int a = 10
+    printf("%d\\n", a);
+    return 0;
+}""",
+        "Logic Review": """#include <stdio.h>
 
-# ==========================================================
-# API KEY
-# ==========================================================
+int main(void) {
+    for (int i = 0; i < 5; i++) {
+        printf("%d ", i);
+    }
+    return 0;
+}""",
+    },
+    "C++": {
+        "Hello World": """#include <iostream>
+using namespace std;
 
-try:
-    GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
-except Exception:
-    GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-
-if not GROQ_API_KEY:
-    st.error("GROQ_API_KEY is missing. Add it in Streamlit Secrets.")
-    st.stop()
-
-
-# ==========================================================
-# STATE
-# ==========================================================
-
-if "source_code" not in st.session_state:
-    st.session_state.source_code = """# Write your code here
-
-def main():
-    a = 10
-    print(a)
-
-main()
-"""
-
-if "language" not in st.session_state:
-    st.session_state.language = "Python"
-
-if "analysis" not in st.session_state:
-    st.session_state.analysis = None
-
-if "run_result" not in st.session_state:
-    st.session_state.run_result = None
-
-
-# ==========================================================
-# EXAMPLES
-# ==========================================================
-
-examples = {
-    "Missing Semicolon": """#include <iostream>
+int main() {
+    cout << "Hello World" << endl;
+    return 0;
+}""",
+        "Missing Semicolon": """#include <iostream>
 using namespace std;
 
 int main() {
     int a = 10
-    cout << a;
+    cout << a << endl;
     return 0;
 }""",
-    "Hello World": """#include <iostream>
-using namespace std;
-
-int main() {
-    cout << "Hello World";
-    return 0;
-}""",
-    "Logic Review": """#include <iostream>
+        "Logic Review": """#include <iostream>
 using namespace std;
 
 int main() {
@@ -540,30 +434,221 @@ int main() {
     }
     return 0;
 }""",
+    },
+    "Java": {
+        "Hello World": """public class Main {
+    public static void main(String[] args) {
+        System.out.println("Hello World");
+    }
+}""",
+        "Missing Semicolon": """public class Main {
+    public static void main(String[] args) {
+        int a = 10
+        System.out.println(a);
+    }
+}""",
+        "Logic Review": """public class Main {
+    public static void main(String[] args) {
+        for (int i = 0; i < 5; i++) {
+            System.out.print(i + " ");
+        }
+    }
+}""",
+    },
+    "Python": {
+        "Hello World": """def main():
+    print("Hello World")
+
+main()""",
+        "Syntax Error": """def main():
+    value = 10
+    print(value
+
+main()""",
+        "Logic Review": """def main():
+    total = 0
+    for i in range(5):
+        total += i
+    print(total)
+
+main()""",
+    },
+    "JavaScript": {
+        "Hello World": """function main() {
+    console.log("Hello World");
+}
+
+main();""",
+        "Syntax Error": """function main() {
+    const value = 10
+    console.log(value);
+}
+
+main();""",
+        "Logic Review": """function main() {
+    let total = 0;
+    for (let i = 0; i < 5; i++) {
+        total += i;
+    }
+    console.log(total);
+}
+
+main();""",
+    },
+    "HTML": {
+        "Hello World": """<!DOCTYPE html>
+<html>
+<head>
+    <title>Code Annotation Ai</title>
+</head>
+<body>
+    <h1>Hello World</h1>
+    <p>Welcome to the web-compiler.</p>
+</body>
+</html>""",
+        "Landing Page": """<!DOCTYPE html>
+<html>
+<head>
+    <title>Demo Page</title>
+</head>
+<body>
+    <main>
+        <h1>Code Annotation Ai</h1>
+        <button onclick="document.body.style.background='#f5f7fa'">
+            Click me
+        </button>
+    </main>
+</body>
+</html>""",
+        "Form": """<!DOCTYPE html>
+<html>
+<body>
+    <form>
+        <label>Name</label>
+        <input type="text" placeholder="Enter your name">
+        <button type="submit">Submit</button>
+    </form>
+</body>
+</html>""",
+    },
+    "CSS": {
+        "Hello World": """body {
+    font-family: Arial, sans-serif;
+    background: #f4f4f4;
+}
+
+h1 {
+    color: #4f46e5;
+}""",
+        "Card": """.card {
+    width: 320px;
+    margin: 40px auto;
+    padding: 24px;
+    border-radius: 14px;
+    background: white;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+}
+
+.card h2 {
+    margin-top: 0;
+}""",
+        "Responsive": """body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+}
+
+.container {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+}
+
+@media (max-width: 800px) {
+    .container {
+        grid-template-columns: 1fr;
+    }
+}""",
+    },
 }
 
 
-# ==========================================================
-# LOCAL CHECKS
-# ==========================================================
+# ============================================================
+# Session state
+# ============================================================
+
+if "language" not in st.session_state:
+    st.session_state.language = "Python"
+
+if "source_code" not in st.session_state:
+    st.session_state.source_code = EXAMPLES["Python"]["Hello World"]
+
+if "analysis" not in st.session_state:
+    st.session_state.analysis = None
+
+if "execution" not in st.session_state:
+    st.session_state.execution = None
+
+if "stdin_text" not in st.session_state:
+    st.session_state.stdin_text = ""
+
+
+# ============================================================
+# Utility helpers
+# ============================================================
+
+def normalize_text(value, fallback=""):
+    return str(value if value is not None else fallback).strip()
+
 
 def bracket_check(code):
     pairs = {"(": ")", "[": "]", "{": "}"}
-    rev = {")": "(", "]": "[", "}": "{"}
+    reverse = {")": "(", "]": "[", "}": "}"}
     stack = []
+    in_single = False
+    in_double = False
+    in_backtick = False
+    escape = False
 
     for line_no, line in enumerate(code.splitlines(), 1):
-        for ch in line:
+        for idx, ch in enumerate(line):
+            if escape:
+                escape = False
+                continue
+
+            if ch == "\\" and (in_single or in_double or in_backtick):
+                escape = True
+                continue
+
+            if ch == "'" and not in_double and not in_backtick:
+                in_single = not in_single
+                continue
+            if ch == '"' and not in_single and not in_backtick:
+                in_double = not in_double
+                continue
+            if ch == "`" and not in_single and not in_double:
+                in_backtick = not in_backtick
+                continue
+
+            if in_single or in_double or in_backtick:
+                continue
+
+            # Ignore common single-line comments.
+            if ch == "#":
+                break
+            if ch == "/" and idx + 1 < len(line) and line[idx + 1] == "/":
+                break
+
             if ch in pairs:
                 stack.append((ch, line_no))
-            elif ch in rev:
-                if not stack or stack[-1][0] != rev[ch]:
+            elif ch in reverse:
+                if not stack or stack[-1][0] != reverse[ch]:
                     return [{
                         "line": line_no,
                         "severity": "Error",
                         "title": "Mismatched bracket or brace",
                         "explanation": f"Unexpected '{ch}' on line {line_no}.",
-                        "fix": "Match every closing bracket with its opening bracket."
+                        "why": "The closing symbol does not match the most recent opening symbol.",
+                        "fix": "Match each closing symbol with the correct opening symbol.",
                     }]
                 stack.pop()
 
@@ -573,8 +658,9 @@ def bracket_check(code):
             "line": line_no,
             "severity": "Error",
             "title": "Missing closing bracket",
-            "explanation": f"'{ch}' opened on line {line_no} has no matching closing bracket.",
-            "fix": "Add the corresponding closing bracket."
+            "explanation": f"'{ch}' opened on line {line_no} has no matching closing symbol.",
+            "why": "The parser expects the block or expression to be closed.",
+            "fix": "Add the corresponding closing bracket, parenthesis, or brace.",
         }]
 
     return []
@@ -584,127 +670,267 @@ def python_check(code):
     try:
         ast.parse(code)
         return []
-    except SyntaxError as e:
+    except SyntaxError as exc:
+        line = exc.lineno or "?"
+        text = (exc.text or "").strip()
         return [{
-            "line": e.lineno or "?",
+            "line": line,
             "severity": "Error",
-            "title": e.msg or "Python syntax error",
-            "explanation": e.text.strip() if e.text else "Python syntax is invalid.",
-            "fix": "Correct the syntax shown on the indicated line."
+            "title": exc.msg or "Python syntax error",
+            "explanation": text or "Python syntax is invalid.",
+            "why": "Python could not parse the source into a valid syntax tree.",
+            "fix": "Correct the syntax around the indicated line and analyze again.",
         }]
 
 
-def cpp_java_semicolon_check(code, language):
-    if language not in ["C++", "Java"]:
+def semicolon_check(code, language):
+    if language not in {"C", "C++", "Java"}:
         return []
 
     issues = []
-    pattern = re.compile(
-        r"^\s*(?:int|float|double|char|bool|long|short|"
-        r"String|boolean|auto|size_t)\s+\w+.*"
+    declaration = re.compile(
+        r"^\s*(?:(?:const|static|final|public|private|protected)\s+)*"
+        r"(?:int|float|double|char|bool|long|short|byte|String|boolean|size_t|auto)"
+        r"\s+\w+.*"
     )
 
-    for n, line in enumerate(code.splitlines(), 1):
-        s = line.strip()
-        if pattern.match(s) and not s.endswith((";", "{", "}")):
+    for line_no, line in enumerate(code.splitlines(), 1):
+        stripped = line.strip()
+        if not stripped or stripped.startswith(("//", "#", "/*", "*")):
+            continue
+        if declaration.match(stripped) and not stripped.endswith((";", "{", "}", ",")):
             issues.append({
-                "line": n,
+                "line": line_no,
                 "severity": "Error",
-                "title": "Missing semicolon",
-                "explanation": f"Missing semicolon at the end of the statement.",
-                "fix": "Add a semicolon ';' at the end of the statement."
+                "title": "Possible missing semicolon",
+                "explanation": "This declaration appears to require a semicolon.",
+                "why": "C, C++, and Java statement declarations normally end with ';'.",
+                "fix": "Add ';' at the end of the statement.",
             })
 
     return issues
 
 
+def javascript_check(code):
+    issues = []
+    lines = code.splitlines()
+    for line_no, line in enumerate(lines, 1):
+        stripped = line.strip()
+        if not stripped or stripped.startswith("//"):
+            continue
+        if re.match(r"^(const|let|var)\s+\w+\s*=", stripped):
+            if not stripped.endswith((";", "{", "}")):
+                issues.append({
+                    "line": line_no,
+                    "severity": "Warning",
+                    "title": "Possible missing semicolon",
+                    "explanation": "This JavaScript statement does not end with ';'.",
+                    "why": "Although JavaScript can often use automatic semicolon insertion, explicit semicolons improve consistency.",
+                    "fix": "Consider adding ';' at the end of the statement.",
+                })
+    return issues
+
+
+class _HTMLValidationParser(HTMLParser):
+    VOID_TAGS = {
+        "area", "base", "br", "col", "embed", "hr", "img",
+        "input", "link", "meta", "param", "source", "track", "wbr",
+    }
+
+    def __init__(self):
+        super().__init__()
+        self.stack = []
+        self.errors = []
+
+    def handle_starttag(self, tag, attrs):
+        tag = tag.lower()
+        if tag not in self.VOID_TAGS:
+            self.stack.append(tag)
+
+    def handle_startendtag(self, tag, attrs):
+        return
+
+    def handle_endtag(self, tag):
+        tag = tag.lower()
+        if tag in self.VOID_TAGS:
+            return
+        if not self.stack or self.stack[-1] != tag:
+            self.errors.append({
+                "line": self.getpos()[0],
+                "severity": "Error",
+                "title": f"Unexpected closing tag </{tag}>",
+                "explanation": "The closing HTML tag does not match the current open element.",
+                "why": "HTML element nesting must remain structurally consistent.",
+                "fix": f"Close the correct parent element before </{tag}>.",
+            })
+            return
+        self.stack.pop()
+
+
+def html_check(code):
+    parser = _HTMLValidationParser()
+    try:
+        parser.feed(code)
+        parser.close()
+    except Exception as exc:
+        parser.errors.append({
+            "line": 1,
+            "severity": "Error",
+            "title": "HTML parsing error",
+            "explanation": str(exc),
+            "why": "The HTML parser could not complete the document.",
+            "fix": "Check tag syntax and nesting.",
+        })
+
+    if parser.stack:
+        parser.errors.append({
+            "line": 1,
+            "severity": "Warning",
+            "title": "Unclosed HTML element",
+            "explanation": f"Open element <{parser.stack[-1]}> was not closed.",
+            "why": "Unclosed elements can produce unexpected browser layout behavior.",
+            "fix": f"Add </{parser.stack[-1]}> where appropriate.",
+        })
+
+    return parser.errors
+
+
 def local_checks(code, language):
-    result = []
-    result.extend(bracket_check(code))
+    issues = []
+    issues.extend(bracket_check(code))
 
     if language == "Python":
-        result.extend(python_check(code))
-    else:
-        result.extend(cpp_java_semicolon_check(code, language))
+        issues.extend(python_check(code))
+    elif language in {"C", "C++", "Java"}:
+        issues.extend(semicolon_check(code, language))
+    elif language == "JavaScript":
+        issues.extend(javascript_check(code))
+    elif language == "HTML":
+        issues.extend(html_check(code))
+
+    return issues
+
+
+def normalize_analysis(ai, local_issues, code, language):
+    result = {
+        "errors": list(ai.get("errors", [])),
+        "warnings": list(ai.get("warnings", [])),
+        "info": list(ai.get("info", [])),
+        "summary": normalize_text(ai.get("summary"), "No summary available."),
+        "corrected_code": normalize_text(ai.get("corrected_code"), code),
+        "time_complexity": normalize_text(ai.get("time_complexity"), "N/A"),
+        "time_explanation": normalize_text(ai.get("time_explanation")),
+        "space_complexity": normalize_text(ai.get("space_complexity"), "N/A"),
+        "space_explanation": normalize_text(ai.get("space_explanation")),
+        "optimization": normalize_text(ai.get("optimization")),
+        "security": normalize_text(ai.get("security")),
+        "notes": normalize_text(ai.get("notes")),
+        "score": int(max(0, min(100, float(ai.get("score", 0))))),
+    }
+
+    existing = result["errors"] + result["warnings"] + result["info"]
+
+    for issue in local_issues:
+        duplicate = any(
+            str(item.get("line")) == str(issue.get("line"))
+            and item.get("title") == issue.get("title")
+            for item in existing
+        )
+        if not duplicate:
+            if issue.get("severity") == "Warning":
+                result["warnings"].insert(0, issue)
+            else:
+                result["errors"].insert(0, issue)
 
     return result
 
 
-# ==========================================================
-# GROQ ANALYSIS
-# ==========================================================
+# ============================================================
+# Groq analysis
+# ============================================================
 
 def analyze_with_ai(code, language):
+    if not GROQ_API_KEY:
+        raise RuntimeError("GROQ_API_KEY is missing.")
+
     client = Groq(api_key=GROQ_API_KEY)
 
     prompt = f"""
-You are Code=Annotation-AI, a professional source-code analysis tool.
+You are Code Annotation Ai, a professional code-analysis and web-compiler assistant.
 
-Analyze this {language} program. Do not execute it.
+Analyze the following {language} source code. Do not invent runtime output.
 
-Return ONLY valid JSON:
-
+Return ONLY valid JSON in this exact shape:
 {{
   "errors": [
     {{
       "line": 1,
-      "severity": "Error|Warning",
+      "severity": "Error",
       "title": "short title",
-      "explanation": "brief explanation",
-      "why": "why the compiler/interpreter complains",
-      "fix": "exact correction"
+      "explanation": "what is wrong",
+      "why": "why it matters",
+      "fix": "specific correction"
     }}
   ],
-  "summary": "brief description of what the code does",
+  "warnings": [],
+  "info": [],
+  "summary": "what the program does",
   "corrected_code": "complete corrected source code",
-  "time_complexity": "O(...)",
-  "time_explanation": "brief reason",
-  "space_complexity": "O(...)",
-  "space_explanation": "brief reason",
-  "optimization": "useful optimization suggestions",
+  "time_complexity": "O(n) or N/A",
+  "time_explanation": "brief explanation",
+  "space_complexity": "O(1) or N/A",
+  "space_explanation": "brief explanation",
+  "optimization": "practical optimization suggestions",
   "security": "basic security review",
-  "notes": "useful learning notes",
+  "notes": "learning notes",
   "score": 0
 }}
 
 Rules:
-- Detect syntax errors.
-- Detect missing semicolons for C++/Java.
-- Detect missing/mismatched brackets.
-- Detect Python indentation/syntax issues.
-- Explain every important error.
-- Return the complete corrected code.
-- Preserve the intended logic.
-- Add concise comments to corrected code where useful.
-- Never invent execution output.
-- Score from 0 to 100.
+- Preserve the intended behavior when correcting code.
+- Detect syntax, structural, logic, and important quality issues.
+- For C, C++, and Java, detect missing semicolons where applicable.
+- For Python, detect syntax and indentation problems.
+- For JavaScript, detect common syntax and logic issues.
+- For HTML, check tag structure and document validity.
+- For CSS, check selectors, braces, declarations, and obvious structural issues.
+- For HTML and CSS, algorithmic complexity is normally "N/A".
+- For simple linear code use O(n); nested loops may be O(n^2); logarithmic algorithms may be O(log n).
+- The complexity should describe the algorithm, not a fabricated benchmark.
+- Return the full corrected source.
+- Keep comments concise and educational where useful.
+- Score quality from 0 to 100.
 
-CODE:
+SOURCE:
 {code}
-"""
+""".strip()
 
     response = client.chat.completions.create(
-        model="openai/gpt-oss-120b",
+        model=GROQ_MODEL,
         messages=[{"role": "user", "content": prompt}],
         temperature=0.1,
+        reasoning_effort="low",
         response_format={"type": "json_object"},
     )
 
-    return json.loads(response.choices[0].message.content)
+    content = response.choices[0].message.content or "{}"
+    return json.loads(content)
 
 
 def analyze_code(code, language):
-    local = local_checks(code, language)
+    local_issues = local_checks(code, language)
 
     try:
         ai = analyze_with_ai(code, language)
-    except Exception as e:
+    except Exception as exc:
         return {
-            "errors": local,
+            "errors": local_issues,
+            "warnings": [],
+            "info": [],
             "summary": "AI analysis could not be completed.",
             "corrected_code": code,
             "time_complexity": "N/A",
-            "time_explanation": str(e),
+            "time_explanation": str(exc),
             "space_complexity": "N/A",
             "space_explanation": "",
             "optimization": "",
@@ -713,44 +939,106 @@ def analyze_code(code, language):
             "score": 0,
         }
 
-    existing = ai.get("errors", [])
-
-    for item in local:
-        if not any(
-            str(x.get("line")) == str(item.get("line"))
-            and x.get("title") == item.get("title")
-            for x in existing
-        ):
-            existing.insert(0, item)
-
-    ai["errors"] = existing
-    return ai
+    return normalize_analysis(ai, local_issues, code, language)
 
 
-# ==========================================================
-# ==========================================================
-# CLOUD CODE RUNNER — JUDGE0
-# ==========================================================
+# ============================================================
+# Complexity graphs
+# ============================================================
 
-LANGUAGE_IDS = {
-    "Python": 71,  # Python 3.8.1
-    "C++": 54,      # GNU++17
-    "Java": 62,     # Java 13
-}
+def complexity_kind(expression):
+    text = expression.lower().replace(" ", "")
+    if "2^n" in text or "2ⁿ" in text or "exponential" in text:
+        return "O(2^n)"
+    if "n!" in text or "factorial" in text:
+        return "O(n!)"
+    if "nlogn" in text or "n*log" in text or "nlog(n)" in text:
+        return "O(n log n)"
+    if "logn" in text or "log(n)" in text:
+        return "O(log n)"
+    if "n^3" in text or "n³" in text:
+        return "O(n^3)"
+    if "n^2" in text or "n²" in text or "quadratic" in text:
+        return "O(n^2)"
+    if re.search(r"\bo\(n\)", text):
+        return "O(n)"
+    if text in {"o(1)", "constant", "constanttime", "constantspace"}:
+        return "O(1)"
+    return "N/A"
 
-JUDGE0_URL = st.secrets.get(
-    "JUDGE0_URL",
-    os.getenv("JUDGE0_URL", "https://ce.judge0.com"),
-).rstrip("/")
+
+def complexity_values(kind):
+    n = np.arange(1, 51)
+    safe_n = n.astype(float)
+
+    if kind == "O(1)":
+        y = np.ones_like(safe_n)
+    elif kind == "O(log n)":
+        y = np.log2(safe_n)
+    elif kind == "O(n)":
+        y = safe_n
+    elif kind == "O(n log n)":
+        y = safe_n * np.log2(safe_n)
+    elif kind == "O(n^2)":
+        y = safe_n**2
+    elif kind == "O(n^3)":
+        y = safe_n**3
+    elif kind == "O(2^n)":
+        y = np.minimum(2.0**safe_n, 1e12)
+    elif kind == "O(n!)":
+        y = np.minimum(np.cumprod(safe_n), 1e12)
+    else:
+        y = None
+
+    if y is None:
+        return n, None
+
+    max_y = max(float(np.max(y)), 1.0)
+    return n, y / max_y
 
 
-def run_corrected(code, language, stdin_text):
-    """Run code through Judge0 so Streamlit Cloud never executes
-    arbitrary user code inside the Streamlit container."""
+def show_complexity_plot(title, expression):
+    kind = complexity_kind(expression)
+    n, y = complexity_values(kind)
+
+    if y is None:
+        st.info(f"{title}: {expression or 'N/A'} — no standard growth curve available.")
+        return
+
+    fig, ax = plt.subplots(figsize=(5.7, 3.05))
+    ax.plot(n, y, linewidth=2)
+    ax.set_title(f"{title} — {kind}", fontsize=11, fontweight="bold")
+    ax.set_xlabel("Input size (normalized)")
+    ax.set_ylabel("Relative growth")
+    ax.grid(alpha=0.22)
+    fig.tight_layout()
+    st.pyplot(fig, use_container_width=True)
+    plt.close(fig)
+
+    st.caption(
+        "The curve visualizes theoretical growth. It is not a measured benchmark of this single execution."
+    )
+
+
+# ============================================================
+# Judge0 execution
+# ============================================================
+
+def run_judge0(code, language, stdin_text):
+    if language not in JUDGE0_IDS:
+        return {
+            "ok": False,
+            "status": "Unsupported",
+            "stdout": "",
+            "stderr": "This language uses browser preview instead of Judge0 execution.",
+            "compile_output": "",
+            "time": None,
+            "memory": None,
+        }
 
     payload = {
         "source_code": code,
-        "language_id": LANGUAGE_IDS[language],
+        "language_id": JUDGE0_IDS[language],
         "stdin": stdin_text or "",
         "cpu_time_limit": 2,
         "wall_time_limit": 5,
@@ -758,98 +1046,140 @@ def run_corrected(code, language, stdin_text):
         "enable_network": False,
     }
 
+    headers = {"Content-Type": "application/json"}
+    if JUDGE0_API_KEY:
+        headers["X-Auth-Token"] = JUDGE0_API_KEY
+
+    start = time.perf_counter()
+
     try:
         response = requests.post(
             f"{JUDGE0_URL}/submissions/?base64_encoded=false&wait=true",
             json=payload,
-            headers={"Content-Type": "application/json"},
-            timeout=25,
+            headers=headers,
+            timeout=30,
         )
     except requests.RequestException as exc:
         return {
             "ok": False,
+            "status": "Connection Error",
             "stdout": "",
             "stderr": f"Judge0 connection error: {exc}",
             "compile_output": "",
-            "status": "Connection Error",
             "time": None,
             "memory": None,
-            "exit_code": -1,
+            "elapsed": time.perf_counter() - start,
         }
 
-    # Some Judge0 hosts disable wait=true. Fall back to token polling.
     if response.status_code not in (200, 201):
         return {
             "ok": False,
-            "stdout": "",
-            "stderr": response.text[:4000],
-            "compile_output": "",
             "status": f"Judge0 HTTP {response.status_code}",
+            "stdout": "",
+            "stderr": response.text[:5000],
+            "compile_output": "",
             "time": None,
             "memory": None,
-            "exit_code": -1,
+            "elapsed": time.perf_counter() - start,
         }
 
     data = response.json()
 
-    if "token" in data and "status" not in data:
+    # Some Judge0 deployments return a token even when wait=true is ignored.
+    if data.get("token") and not data.get("stdout") and not data.get("status"):
         token = data["token"]
-
-        for _ in range(18):
+        for _ in range(20):
             time.sleep(0.6)
             try:
-                r = requests.get(
+                poll = requests.get(
                     f"{JUDGE0_URL}/submissions/{token}?base64_encoded=false",
+                    headers=headers,
                     timeout=10,
                 )
-                if r.status_code != 200:
+                if poll.status_code != 200:
                     continue
-
-                data = r.json()
+                data = poll.json()
                 status_id = (data.get("status") or {}).get("id")
-
                 if status_id not in (1, 2):
                     break
             except requests.RequestException:
                 continue
 
     status = (data.get("status") or {}).get("description", "Unknown")
-    ok = status == "Accepted"
-
     return {
-        "ok": ok,
+        "ok": status == "Accepted",
+        "status": status,
         "stdout": data.get("stdout") or "",
         "stderr": data.get("stderr") or "",
         "compile_output": data.get("compile_output") or "",
-        "status": status,
         "message": data.get("message") or "",
         "time": data.get("time"),
         "memory": data.get("memory"),
-        "exit_code": data.get("exit_code", 0),
+        "elapsed": time.perf_counter() - start,
     }
 
 
-# PDF
-# ==========================================================
+# ============================================================
+# Browser preview for HTML/CSS
+# ============================================================
+
+def html_preview(source, language):
+    if language == "HTML":
+        document = source
+    elif language == "CSS":
+        document = f"""<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>{source}</style>
+</head>
+<body>
+<div class="preview-shell">
+    <h1>CSS Preview</h1>
+    <p>This preview wraps your CSS with a small sample document.</p>
+    <button>Sample Button</button>
+</div>
+</body>
+</html>"""
+    else:
+        return
+
+    components.html(
+        document,
+        height=430,
+        scrolling=True,
+    )
+
+
+# ============================================================
+# PDF report
+# ============================================================
 
 def make_pdf(language, original, result):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_auto_page_break(True, 15)
 
-    def safe(s):
-        return str(s).encode("latin-1", "replace").decode("latin-1")
+    def safe(value):
+        return (
+            str(value)
+            .encode("latin-1", "replace")
+            .decode("latin-1")
+        )
 
     pdf.set_font("Helvetica", "B", 18)
-    pdf.cell(0, 11, safe("Code=Annotation-AI Report"), ln=True, align="C")
+    pdf.cell(0, 10, safe("Code Annotation Ai Report"), ln=True, align="C")
 
     pdf.set_font("Helvetica", "", 10)
     pdf.cell(0, 7, safe(f"Language: {language}"), ln=True)
-    pdf.ln(4)
+    pdf.ln(3)
 
     sections = [
         ("Analysis Summary", result.get("summary", "")),
         ("Errors", json.dumps(result.get("errors", []), indent=2)),
+        ("Warnings", json.dumps(result.get("warnings", []), indent=2)),
+        ("Info", json.dumps(result.get("info", []), indent=2)),
         ("Time Complexity", result.get("time_complexity", "")),
         ("Time Explanation", result.get("time_explanation", "")),
         ("Space Complexity", result.get("space_complexity", "")),
@@ -866,454 +1196,395 @@ def make_pdf(language, original, result):
         pdf.cell(0, 7, safe(heading), ln=True)
         pdf.set_font("Helvetica", "", 9)
         pdf.multi_cell(0, 5, safe(body))
-        pdf.ln(3)
+        pdf.ln(2)
 
-    output = pdf.output()
-    return output.encode("latin-1") if isinstance(output, str) else bytes(output)
+    return bytes(pdf.output(dest="S"))
 
 
-# ==========================================================
-# TOP CONTROLS
-# ==========================================================
+# ============================================================
+# Controls
+# ============================================================
 
-c1, c2, c3, c4, c5 = st.columns([1.0, 1.45, .9, .9, .9], gap="small")
+c1, c2, c3, c4, c5 = st.columns([1.0, 1.45, 1.0, 0.9, 0.9], gap="small")
 
 with c1:
-    st.markdown('<div class="control-label">Select Language</div>', unsafe_allow_html=True)
-    language = st.selectbox(
+    st.markdown('<div class="toolbar-label">Language</div>', unsafe_allow_html=True)
+    selected_language = st.selectbox(
         "language",
-        ["C++", "Python", "Java"],
-        index=["C++", "Python", "Java"].index(st.session_state.language),
+        LANGUAGES,
+        index=LANGUAGES.index(st.session_state.language),
         label_visibility="collapsed",
     )
 
 with c2:
-    st.markdown('<div class="control-label">Example</div>', unsafe_allow_html=True)
-    example = st.selectbox(
+    st.markdown('<div class="toolbar-label">Example</div>', unsafe_allow_html=True)
+    example_names = list(EXAMPLES[selected_language].keys())
+    selected_example = st.selectbox(
         "example",
-        ["Missing Semicolon", "Hello World", "Logic Review"],
+        example_names,
         label_visibility="collapsed",
     )
 
 with c3:
-    st.markdown("<div style='height:22px'></div>", unsafe_allow_html=True)
-    analyze = st.button("⌁  Analyze Code", type="primary", use_container_width=True)
+    st.markdown('<div class="toolbar-label">&nbsp;</div>', unsafe_allow_html=True)
+    load_example = st.button("Load Example", use_container_width=True)
 
 with c4:
-    st.markdown("<div style='height:22px'></div>", unsafe_allow_html=True)
-    clear = st.button("▢  Clear Code", use_container_width=True)
+    st.markdown('<div class="toolbar-label">&nbsp;</div>', unsafe_allow_html=True)
+    analyze_button = st.button("Analyze", type="primary", use_container_width=True)
 
 with c5:
-    st.markdown("<div style='height:22px'></div>", unsafe_allow_html=True)
-    copy = st.button("▣  Copy Code", use_container_width=True)
+    st.markdown('<div class="toolbar-label">&nbsp;</div>', unsafe_allow_html=True)
+    clear_button = st.button("Clear", use_container_width=True)
 
-
-if language != st.session_state.language:
-    st.session_state.language = language
-    if language == "C++":
-        st.session_state.source_code = examples["Missing Semicolon"]
-    elif language == "Java":
-        st.session_state.source_code = """public class Main {
-    public static void main(String[] args) {
-        int a = 10
-        System.out.println(a);
-    }
-}"""
-    else:
-        st.session_state.source_code = """def main():
-    a = 10
-    print(a)
-
-main()"""
+if selected_language != st.session_state.language:
+    st.session_state.language = selected_language
+    st.session_state.source_code = EXAMPLES[selected_language][list(EXAMPLES[selected_language].keys())[0]]
     st.session_state.analysis = None
-    st.session_state.run_result = None
+    st.session_state.execution = None
     st.rerun()
 
-if clear:
+if load_example:
+    st.session_state.source_code = EXAMPLES[selected_language][selected_example]
+    st.session_state.analysis = None
+    st.session_state.execution = None
+    st.rerun()
+
+if clear_button:
     st.session_state.source_code = ""
     st.session_state.analysis = None
-    st.session_state.run_result = None
+    st.session_state.execution = None
     st.rerun()
 
-if example:
-    # Only load an example when Analyze is not being pressed.
-    pass
 
+# ============================================================
+# Editor + analysis summary
+# ============================================================
 
-# ==========================================================
-# MAIN TWO-COLUMN PANELS
-# ==========================================================
-
-left, right = st.columns([1, 1], gap="small")
+left, right = st.columns([1.18, 0.82], gap="medium")
 
 with left:
-    st.markdown("""
-    <div class="panel">
-        <div class="panel-heading">
-            <span class="heading-icon">&lt;/&gt;</span>
-            Your Code
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown('<div class="card-title">Code Editor</div>', unsafe_allow_html=True)
 
-    source = st.text_area(
-        "source",
+    source = st_ace(
         value=st.session_state.source_code,
-        height=330,
-        label_visibility="collapsed",
-        placeholder="Write or paste your source code here...",
+        language=ACE_MODES[selected_language],
+        theme="tomorrow_night",
+        height=430,
+        font_size=14,
+        tab_size=4,
+        wrap=False,
+        show_gutter=True,
+        show_print_margin=False,
+        auto_update=True,
+        key=f"code_editor_{selected_language}",
     )
 
+    if source is None:
+        source = st.session_state.source_code
     st.session_state.source_code = source
 
-    st.markdown('<div class="control-label">Input / Custom Input (stdin)</div>', unsafe_allow_html=True)
-
+    st.markdown('<div class="toolbar-label" style="margin-top:10px;">Custom Input (stdin)</div>', unsafe_allow_html=True)
     stdin_text = st.text_area(
         "stdin",
-        height=78,
+        value=st.session_state.stdin_text,
+        height=74,
         label_visibility="collapsed",
-        placeholder="Enter input for the program (if any)",
+        placeholder="Enter program input here, one value per line if needed...",
     )
+    st.session_state.stdin_text = stdin_text
 
 with right:
     result = st.session_state.analysis
-
-    if result is None:
-        errors = []
-    else:
-        errors = result.get("errors", [])
-
-    error_count = len([e for e in errors if e.get("severity", "Error") == "Error"])
-    warning_count = len([e for e in errors if e.get("severity") == "Warning"])
+    errors = result.get("errors", []) if result else []
+    warnings = result.get("warnings", []) if result else []
+    infos = result.get("info", []) if result else []
     score = result.get("score", 0) if result else 0
 
-    st.markdown("""
-    <div class="panel">
-        <div class="panel-heading">Analysis Summary</div>
-    """, unsafe_allow_html=True)
+    st.markdown('<div class="card-title">Analysis Summary</div>', unsafe_allow_html=True)
 
-    st.markdown(f"""
-    <div class="summary-grid">
-        <div class="summary-card">
-            <div class="summary-label red">Errors</div>
-            <div class="summary-value red">{error_count}</div>
+    st.markdown(
+        f"""
+        <div class="summary-grid">
+            <div class="summary-item">
+                <div class="summary-label error">Errors</div>
+                <div class="summary-value error">{len(errors)}</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-label warning">Warnings</div>
+                <div class="summary-value">{len(warnings)}</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-label info">Info</div>
+                <div class="summary-value">{len(infos)}</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-label success">Score</div>
+                <div class="summary-value success">{score}<small style="font-size:12px;">/100</small></div>
+            </div>
         </div>
-        <div class="summary-card">
-            <div class="summary-label orange">Warnings</div>
-            <div class="summary-value">{warning_count}</div>
-        </div>
-        <div class="summary-card">
-            <div class="summary-label blue">Info</div>
-            <div class="summary-value">0</div>
-        </div>
-        <div class="summary-card">
-            <div class="summary-label green">Score</div>
-            <div class="summary-value green">{score}<small style="font-size:13px">/100</small></div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+        """,
+        unsafe_allow_html=True,
+    )
 
-    if errors:
+    if result and errors:
         first = errors[0]
-        st.markdown(f"""
-        <div class="error-section">
-            <div class="error-title">⊕ &nbsp; Errors Found</div>
-            <div class="error-card">
-                <div class="error-line">Line {first.get("line", "?")}</div>
-                <div class="error-text">{first.get("title", "Issue")}<br>
-                {first.get("explanation", "")}</div>
-                <div class="why">Why?</div>
-                <div class="error-text">{first.get("why", first.get("explanation", ""))}</div>
-                <div class="fix">How to Fix?</div>
-                <div class="error-text">{first.get("fix", "")}</div>
+        st.markdown(
+            f"""
+            <div class="issue-box">
+                <div class="line">Line {html.escape(str(first.get("line", "?")))}</div>
+                <b>{html.escape(str(first.get("title", "Issue")))}</b><br>
+                {html.escape(str(first.get("explanation", "")))}<br><br>
+                <b>Why?</b><br>
+                {html.escape(str(first.get("why", "")))}<br><br>
+                <b>How to Fix?</b><br>
+                {html.escape(str(first.get("fix", "")))}
             </div>
-        </div>
-        """, unsafe_allow_html=True)
+            """,
+            unsafe_allow_html=True,
+        )
+    elif result:
+        st.markdown(
+            '<div class="issue-box"><div class="line" style="color:#149447;">No blocking errors found.</div>'
+            "Review the analysis tabs for quality, optimization, security, and complexity feedback.</div>",
+            unsafe_allow_html=True,
+        )
     else:
-        st.markdown("""
-        <div class="error-section">
-            <div class="error-title">✓ &nbsp; No Errors Found</div>
-            <div class="error-card">
-                <div class="error-text">
-                    Analyze the code to receive syntax, logic, complexity and
-                    optimization feedback.
-                </div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown(
+            '<div class="issue-box">Analyze the code to receive syntax, logic, complexity, optimization, and security feedback.</div>',
+            unsafe_allow_html=True,
+        )
 
 
-# ==========================================================
-# ANALYZE
-# ==========================================================
+# ============================================================
+# Analyze action
+# ============================================================
 
-if analyze:
+if analyze_button:
     if not source.strip():
         st.warning("Please enter code before analyzing.")
     elif len(source) > MAX_CODE:
         st.error(f"Code is too large. Maximum size is {MAX_CODE} characters.")
     else:
-        with st.spinner("Analyzing code..."):
-            st.session_state.analysis = analyze_code(source, language)
-            st.session_state.run_result = None
+        with st.spinner("Analyzing code with Code Annotation Ai..."):
+            st.session_state.analysis = analyze_code(source, selected_language)
+            st.session_state.execution = None
         st.rerun()
 
 
-# ==========================================================
-# RESULT AREA
-# ==========================================================
+# ============================================================
+# Result tabs
+# ============================================================
 
 result = st.session_state.analysis
 
-st.markdown('<div class="result-card">', unsafe_allow_html=True)
-
-tabs = st.tabs([
-    "Corrected Code",
-    "Explanation",
-    "Time & Space Complexity",
-    "Optimization",
-    "Security",
-    "Notes",
-])
-
 if result:
+    tabs = st.tabs(
+        [
+            "Corrected Code",
+            "Explanation",
+            "Time & Space Complexity",
+            "Optimization",
+            "Security",
+            "Notes",
+        ]
+    )
+
     with tabs[0]:
+        st.subheader("Corrected Code")
         corrected = result.get("corrected_code", source)
+        st.code(corrected, language=selected_language.lower())
+        st.download_button(
+            "Download Corrected Code",
+            data=corrected,
+            file_name=f"main.{EXTENSIONS[selected_language]}",
+            mime="text/plain",
+            use_container_width=True,
+        )
 
-        a, b = st.columns([5, 1])
-        with a:
-            st.markdown("### Corrected Code")
-        with b:
-            if st.button("▣  Copy", key="copy_corrected", use_container_width=True):
-                st.toast("Corrected code is ready to copy from the code block.")
-
-        st.code(corrected, language=language.lower())
-
-        x, y = st.columns(2)
-        with x:
-            st.markdown(f"""
+        st.markdown(
+            f"""
             <div class="note-box">
-                <b>What Does This Code Do?</b><br><br>
-                {result.get("summary", "No summary available.")}
+                <b>What does this code do?</b><br><br>
+                {html.escape(result.get("summary", "No summary available."))}
             </div>
-            """, unsafe_allow_html=True)
-
-        with y:
-            st.markdown(f"""
-            <div class="note-box">
-                <b>Language</b><br><br>
-                {language}<br><br>
-                <b>Lines</b><br>
-                {len(corrected.splitlines())}
-            </div>
-            """, unsafe_allow_html=True)
+            """,
+            unsafe_allow_html=True,
+        )
 
     with tabs[1]:
-        if result.get("errors"):
-            for e in result["errors"]:
-                st.markdown(f"""
-                <div class="note-box" style="margin-bottom:10px">
-                    <b>Line {e.get("line", "?")} — {e.get("title", "Issue")}</b><br><br>
-                    <b>Explanation:</b> {e.get("explanation", "")}<br><br>
-                    <b>Why:</b> {e.get("why", "")}<br><br>
-                    <b>How to Fix:</b> {e.get("fix", "")}
-                </div>
-                """, unsafe_allow_html=True)
+        issues = (
+            result.get("errors", [])
+            + result.get("warnings", [])
+            + result.get("info", [])
+        )
+        if issues:
+            for issue in issues:
+                color = (
+                    "error" if issue.get("severity") == "Error"
+                    else "warning" if issue.get("severity") == "Warning"
+                    else "info"
+                )
+                st.markdown(
+                    f"""
+                    <div class="note-box">
+                        <b class="{color}">Line {html.escape(str(issue.get("line", "?")))} — {html.escape(str(issue.get("title", "Issue")))}</b><br><br>
+                        <b>Explanation:</b> {html.escape(str(issue.get("explanation", "")))}<br><br>
+                        <b>Why:</b> {html.escape(str(issue.get("why", "")))}<br><br>
+                        <b>How to Fix:</b> {html.escape(str(issue.get("fix", "")))}
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
         else:
             st.success("No significant issues were found.")
 
     with tabs[2]:
-        x, y = st.columns(2)
+        col_a, col_b = st.columns(2)
+        with col_a:
+            st.markdown("### Time Complexity")
+            st.metric("Complexity", result.get("time_complexity", "N/A"))
+            st.write(result.get("time_explanation", ""))
+            show_complexity_plot(
+                "Time Complexity Growth",
+                result.get("time_complexity", "N/A"),
+            )
 
-        with x:
-            st.markdown(f"""
-            <div class="note-box">
-                <b>Time Complexity</b><br><br>
-                <strong style="font-size:20px">{result.get("time_complexity", "N/A")}</strong>
-                <br><br>{result.get("time_explanation", "")}
-            </div>
-            """, unsafe_allow_html=True)
-
-        with y:
-            st.markdown(f"""
-            <div class="note-box">
-                <b>Space Complexity</b><br><br>
-                <strong style="font-size:20px">{result.get("space_complexity", "N/A")}</strong>
-                <br><br>{result.get("space_explanation", "")}
-            </div>
-            """, unsafe_allow_html=True)
+        with col_b:
+            st.markdown("### Space Complexity")
+            st.metric("Complexity", result.get("space_complexity", "N/A"))
+            st.write(result.get("space_explanation", ""))
+            show_complexity_plot(
+                "Space Complexity Growth",
+                result.get("space_complexity", "N/A"),
+            )
 
     with tabs[3]:
         st.markdown(
-            f'<div class="note-box">{result.get("optimization", "No optimization notes.")}</div>',
+            f'<div class="note-box">{html.escape(result.get("optimization", "No optimization notes."))}</div>',
             unsafe_allow_html=True,
         )
 
     with tabs[4]:
         st.markdown(
-            f'<div class="note-box">{result.get("security", "No security notes.")}</div>',
+            f'<div class="note-box">{html.escape(result.get("security", "No security notes."))}</div>',
             unsafe_allow_html=True,
         )
 
     with tabs[5]:
         st.markdown(
-            f'<div class="note-box">{result.get("notes", "No notes.")}</div>',
+            f'<div class="note-box">{html.escape(result.get("notes", "No notes."))}</div>',
             unsafe_allow_html=True,
         )
 
+    # ========================================================
+    # Run / Preview section
+    # ========================================================
+
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+    st.markdown('<div class="card-title">Run / Preview</div>', unsafe_allow_html=True)
+
+    if selected_language in {"HTML", "CSS"}:
+        st.markdown(
+            '<div class="small-caption">Browser preview for markup and styles.</div>',
+            unsafe_allow_html=True,
+        )
+        html_preview(corrected, selected_language)
+    else:
+        run_col, status_col = st.columns([1.05, 3.95])
+
+        with run_col:
+            run_button = st.button("▶ Run Code", type="primary", use_container_width=True)
+        with status_col:
+            if st.session_state.execution:
+                elapsed = st.session_state.execution.get("elapsed")
+                if elapsed is not None:
+                    st.caption(f"Last execution: {elapsed:.3f}s")
+
+        if run_button:
+            with st.spinner("Compiling and running..."):
+                execution = run_judge0(
+                    corrected,
+                    selected_language,
+                    st.session_state.stdin_text,
+                )
+                st.session_state.execution = execution
+            st.rerun()
+
+        execution = st.session_state.execution
+        out_col, err_col = st.columns(2)
+
+        with out_col:
+            st.markdown(
+                '<div class="output-panel"><div class="output-head">Program Output</div>',
+                unsafe_allow_html=True,
+            )
+            output = (
+                execution.get("stdout", "")
+                if execution else
+                "Run the corrected code to see output."
+            )
+            st.markdown(
+                f'<div class="output-body">{html.escape(output or "(no output)")}</div></div>',
+                unsafe_allow_html=True,
+            )
+
+        with err_col:
+            st.markdown(
+                '<div class="output-panel"><div class="output-head">Compiler / Runtime Messages</div>',
+                unsafe_allow_html=True,
+            )
+
+            if execution:
+                message = execution.get("stderr", "") or execution.get("compile_output", "")
+                if execution.get("message"):
+                    message = f"{message}\n{execution['message']}".strip()
+                if execution.get("ok"):
+                    message = message or "Compilation successful. Exit code: 0"
+                    cls = "output-body"
+                else:
+                    message = message or execution.get("status", "Execution failed.")
+                    cls = "output-body output-error"
+            else:
+                message = "No execution yet."
+                cls = "output-body"
+
+            st.markdown(
+                f'<div class="{cls}">{html.escape(message)}</div></div>',
+                unsafe_allow_html=True,
+            )
+
+    pdf_data = make_pdf(selected_language, source, result)
+    st.download_button(
+        "Download Analysis Report (PDF)",
+        data=pdf_data,
+        file_name="Code_Annotation_Ai_Report.pdf",
+        mime="application/pdf",
+        use_container_width=True,
+    )
+
 else:
-    st.markdown("""
-    <div style="padding:38px;text-align:center;color:#778194">
-        Analyze your code to display corrected code, explanation,
-        complexity, optimization and security review.
-    </div>
-    """, unsafe_allow_html=True)
-
-st.markdown("</div>", unsafe_allow_html=True)
-
-
-# ==========================================================
-# RUN CORRECTED CODE
-# ==========================================================
-
-if result:
-    st.markdown('<div class="result-card runner">', unsafe_allow_html=True)
-
     st.markdown(
-        '<div class="runner-title">▣ &nbsp; Run Corrected Code</div>',
+        """
+        <div class="note-box" style="text-align:center; margin-top:14px;">
+            Start by writing code in the editor, choose a language, then press
+            <b>Analyze</b> to generate corrected code, explanations, complexity,
+            optimization, and security feedback.
+        </div>
+        """,
         unsafe_allow_html=True,
     )
 
-    r1, r2, r3 = st.columns([1, 1, 4])
 
-    with r1:
-        run_button = st.button(
-            "▶  Run Code",
-            type="primary",
-            use_container_width=True,
-            key="run_corrected",
-        )
-
-    with r2:
-        st.button(
-            "■  Stop",
-            use_container_width=True,
-            disabled=True,
-            key="stop_disabled",
-        )
-
-    with r3:
-        if st.session_state.run_result:
-            elapsed = st.session_state.run_result.get("elapsed", 0)
-            st.markdown(
-                f'<div class="runner-time">Execution Time: '
-                f'<b style="color:#159447">{elapsed:.3f} sec</b></div>',
-                unsafe_allow_html=True,
-            )
-
-    if run_button:
-        corrected = result.get("corrected_code", source)
-
-        start = time.perf_counter()
-
-        with st.spinner("Compiling and running corrected code..."):
-            execution = run_corrected(corrected, language, stdin_text)
-
-        execution["elapsed"] = time.perf_counter() - start
-        st.session_state.run_result = execution
-        st.rerun()
-
-    execution = st.session_state.run_result
-
-    o1, o2 = st.columns(2)
-
-    with o1:
-        st.markdown('<div class="control-label">Program Output</div>', unsafe_allow_html=True)
-
-        if execution and execution.get("ok"):
-            output = execution.get("stdout", "")
-            st.markdown(
-                f'<div class="console">{output if output else "(no output)"}</div>',
-                unsafe_allow_html=True,
-            )
-        elif execution:
-            st.markdown(
-                '<div class="console console-error">Execution failed.</div>',
-                unsafe_allow_html=True,
-            )
-        else:
-            st.markdown(
-                '<div class="console">Run the corrected code to see output.</div>',
-                unsafe_allow_html=True,
-            )
-
-    with o2:
-        st.markdown('<div class="control-label">Compiler Messages</div>', unsafe_allow_html=True)
-
-        if execution:
-            if execution.get("ok"):
-                msg = "Compilation successful.\nExit code: 0"
-                cls = "console"
-            else:
-                msg = execution.get("stderr", "Unknown error.")
-                cls = "console console-error"
-
-            st.markdown(
-                f'<div class="{cls}">{msg}</div>',
-                unsafe_allow_html=True,
-            )
-        else:
-            st.markdown(
-                '<div class="console">No execution yet.</div>',
-                unsafe_allow_html=True,
-            )
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    d1, d2 = st.columns([1, 1])
-
-    with d1:
-        pdf_data = make_pdf(language, source, result)
-
-        st.download_button(
-            "▤  Download Report (PDF)",
-            data=pdf_data,
-            file_name="Code_Annotation_AI_Report.pdf",
-            mime="application/pdf",
-            use_container_width=True,
-        )
-
-    with d2:
-        st.download_button(
-            "⇩  Download Corrected Code",
-            data=result.get("corrected_code", ""),
-            file_name=(
-                "main.py" if language == "Python"
-                else "main.cpp" if language == "C++"
-                else "Main.java"
-            ),
-            mime="text/plain",
-            use_container_width=True,
-        )
-
-    st.markdown("</div>", unsafe_allow_html=True)
-
-
-# ==========================================================
-# FOOTER
-# ==========================================================
+# ============================================================
+# Footer
+# ============================================================
 
 st.markdown(
-    f"""
-    <div class="footer-text">
-        Code=Annotation-AI © 2025 &nbsp;|&nbsp; Built with Streamlit
-        &nbsp;|&nbsp;
-        <a href="{GITHUB_URL}" target="_blank">Project Repository</a>
+    """
+    <div class="footer">
+        Code Annotation Ai &nbsp;•&nbsp; a web-compiler &nbsp;•&nbsp; Built with Streamlit
     </div>
     """,
     unsafe_allow_html=True,
 )
-
-st.markdown("</div>", unsafe_allow_html=True)
