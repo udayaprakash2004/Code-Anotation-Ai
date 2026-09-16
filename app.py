@@ -477,6 +477,138 @@ st.markdown(
         line-height: 1.45;
     }
 
+    .section-card {
+        background: #ffffff;
+        border: 1px solid #d8e1ec;
+        border-radius: 10px;
+        margin: 14px 0;
+        overflow: hidden;
+        box-shadow: 0 6px 18px rgba(20, 35, 60, .045);
+    }
+
+    .section-head {
+        padding: 14px 16px;
+        background: linear-gradient(180deg, #f7faff 0%, #edf4fc 100%);
+        border-bottom: 1px solid #dce5ef;
+        color: #153a78 !important;
+        font-size: 16px !important;
+        font-weight: 850 !important;
+    }
+
+    .section-body {
+        padding: 15px 16px 16px 16px;
+        color: #27364e !important;
+        font-size: 13px;
+        line-height: 1.65;
+    }
+
+    .feature-badge {
+        display: inline-block;
+        margin-bottom: 10px;
+        padding: 4px 8px;
+        border-radius: 999px;
+        background: #e7f0ff;
+        border: 1px solid #c9dcff;
+        color: #174ea6 !important;
+        font-size: 10px;
+        font-weight: 850;
+        letter-spacing: .55px;
+    }
+
+    .always-visible-label {
+        margin: 18px 0 8px 0;
+        color: #123b7a !important;
+        font-size: 15px !important;
+        font-weight: 850 !important;
+        text-transform: uppercase;
+        letter-spacing: .45px;
+    }
+
+    .complexity-panel {
+        overflow: hidden;
+        border: 1px solid #cbd9ea;
+        border-radius: 10px;
+        background: #ffffff;
+        box-shadow: 0 6px 18px rgba(20, 35, 60, .05);
+    }
+
+    .complexity-head {
+        padding: 13px 14px;
+        background: linear-gradient(180deg, #f4f8ff 0%, #eaf2ff 100%);
+        border-bottom: 1px solid #d8e4f2;
+        color: #173f80 !important;
+        font-size: 15px !important;
+        font-weight: 850 !important;
+    }
+
+    .complexity-value-box {
+        padding: 10px 14px 4px 14px;
+    }
+
+    .complexity-label {
+        color: #596b84 !important;
+        font-size: 12px !important;
+        font-weight: 750 !important;
+        margin-bottom: 3px;
+    }
+
+    .complexity-value {
+        color: #143f94 !important;
+        font-size: 32px !important;
+        line-height: 1.05;
+        font-weight: 900 !important;
+        letter-spacing: -.5px;
+    }
+
+    .complexity-description {
+        color: #526277 !important;
+        font-size: 12px !important;
+        padding: 0 14px 8px 14px;
+    }
+
+    .report-highlight {
+        margin: 18px 0 10px 0;
+        padding: 16px 18px;
+        border: 2px solid #2f66c9;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #eff6ff 0%, #ffffff 78%);
+        box-shadow: 0 8px 24px rgba(37,99,235,.09);
+    }
+
+    .report-title {
+        color: #153a78 !important;
+        font-size: 18px !important;
+        font-weight: 900 !important;
+        margin-bottom: 4px;
+    }
+
+    .report-subtitle {
+        color: #52657f !important;
+        font-size: 12px !important;
+        margin-bottom: 10px;
+    }
+
+    .run-highlight {
+        margin: 18px 0 10px 0;
+        padding: 15px 17px;
+        border: 1px solid #cfdbea;
+        border-radius: 12px;
+        background: #ffffff;
+        box-shadow: 0 6px 18px rgba(20,35,60,.045);
+    }
+
+    .run-title {
+        color: #153a78 !important;
+        font-size: 18px !important;
+        font-weight: 900 !important;
+        margin-bottom: 4px;
+    }
+
+    .run-subtitle {
+        color: #5b6c83 !important;
+        font-size: 12px !important;
+    }
+
     @media (max-width: 900px) {
         .brand-shell {
             align-items: flex-start;
@@ -516,43 +648,52 @@ def load_logo_data_uri(path):
 
 logo_uri = load_logo_data_uri(LOGO_PATH)
 
-if logo_uri:
-    st.markdown(
-        f"""
-        <div class="brand-shell">
-            <div class="brand-left">
-                <img class="brand-logo" src="{logo_uri}" alt="Code Annotation Ai logo">
-                <div class="brand-copy">
-                    <div class="brand-title">Code Annotation Ai</div>
-                    <div class="brand-subtitle">a web-compiler</div>
+brand_left, brand_right = st.columns([3.1, 1.35], gap="small")
+
+with brand_left:
+    if logo_uri:
+        st.markdown(
+            f"""
+            <div class="brand-bar" style="gap:16px;">
+                <img class="brand-logo" src="{logo_uri}" alt="Code Annotation Ai logo"
+                     style="width:108px;height:64px;object-fit:contain;">
+                <div>
+                    <div style="font-size:27px;font-weight:900;line-height:1.05;color:#0f2347;">
+                        Code Annotation Ai
+                    </div>
+                    <div style="margin-top:4px;font-size:13px;font-weight:700;color:#4b6ea8;">
+                        a web-compiler
+                    </div>
                 </div>
             </div>
-            <div class="brand-nav">
-                <span>Home</span>
-                <span>Analyze</span>
-                <span>Run</span>
-                <span>Report</span>
+            """,
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            """
+            <div class="brand-bar">
+                <div>
+                    <div style="font-size:27px;font-weight:900;color:#0f2347;">
+                        Code Annotation Ai
+                    </div>
+                    <div style="margin-top:4px;font-size:13px;font-weight:700;color:#4b6ea8;">
+                        a web-compiler
+                    </div>
+                </div>
             </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-else:
+            """,
+            unsafe_allow_html=True,
+        )
+
+with brand_right:
     st.markdown(
         """
-        <div class="brand-shell">
-            <div class="brand-left">
-                <div class="brand-copy">
-                    <div class="brand-title">Code Annotation Ai</div>
-                    <div class="brand-subtitle">a web-compiler</div>
-                </div>
-            </div>
-            <div class="brand-nav">
-                <span>Home</span>
-                <span>Analyze</span>
-                <span>Run</span>
-                <span>Report</span>
-            </div>
+        <div class="brand-bar brand-nav">
+            <span>Home</span>
+            <span>Analyze</span>
+            <span>Run</span>
+            <span>Report</span>
         </div>
         """,
         unsafe_allow_html=True,
@@ -1403,6 +1544,10 @@ def make_pdf(language, original, result):
         ("Optimization", result.get("optimization", "")),
         ("Security", result.get("security", "")),
         ("Notes", result.get("notes", "")),
+        ("Verification Status", result.get("execution_status", "Not run")),
+        ("Execution Time", result.get("execution_time", "")),
+        ("Program Output", result.get("execution_stdout", "")),
+        ("Compiler / Runtime Messages", result.get("execution_stderr", "") or result.get("execution_compile_output", "")),
         ("Original Code", original),
         ("Corrected Code", result.get("corrected_code", "")),
     ]
@@ -1587,7 +1732,19 @@ with right:
             unsafe_allow_html=True,
         )
         time_expression = result.get("time_complexity", "N/A") if result else "N/A"
-        st.metric("Big-O", time_expression)
+        st.markdown(
+            f"""
+            <div class="complexity-value-box">
+                <div class="complexity-label">Big-O Time</div>
+                <div class="complexity-value">{html.escape(str(time_expression))}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            f'<div class="complexity-description">{html.escape(result.get("time_explanation", "") if result else "")}</div>',
+            unsafe_allow_html=True,
+        )
         show_complexity_plot("Time Complexity Growth", time_expression)
         st.markdown("</div></div>", unsafe_allow_html=True)
 
@@ -1597,7 +1754,19 @@ with right:
             unsafe_allow_html=True,
         )
         space_expression = result.get("space_complexity", "N/A") if result else "N/A"
-        st.metric("Big-O", space_expression)
+        st.markdown(
+            f"""
+            <div class="complexity-value-box">
+                <div class="complexity-label">Big-O Space</div>
+                <div class="complexity-value">{html.escape(str(space_expression))}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            f'<div class="complexity-description">{html.escape(result.get("space_explanation", "") if result else "")}</div>',
+            unsafe_allow_html=True,
+        )
         show_complexity_plot("Space Complexity Growth", space_expression)
         st.markdown("</div></div>", unsafe_allow_html=True)
 
@@ -1727,12 +1896,24 @@ else:
     )
 
 
-# ========================================================
-    # Run / Preview section
-    # ========================================================
+# ============================================================
+# Run / Verify + Final Report
+# ============================================================
 
-    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
-    st.markdown('<div class="card-title">Run / Preview</div>', unsafe_allow_html=True)
+if result:
+    corrected = result.get("corrected_code", source)
+
+    st.markdown(
+        """
+        <div class="run-highlight">
+            <div class="run-title">▶ Run / Verify Corrected Code</div>
+            <div class="run-subtitle">
+                Execute the AI-corrected program and verify whether it compiles and runs successfully.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     if selected_language in {"HTML", "CSS"}:
         st.markdown(
@@ -1741,18 +1922,35 @@ else:
         )
         html_preview(corrected, selected_language)
     else:
-        run_col, status_col = st.columns([1.05, 3.95])
+        run_col, status_col = st.columns([1.45, 3.55], gap="small")
 
         with run_col:
-            run_button = st.button("▶ Run Code", type="primary", use_container_width=True)
+            run_button = st.button(
+                "▶  Run Corrected Code",
+                type="primary",
+                use_container_width=True,
+                key="run_verified_code",
+            )
+
         with status_col:
             if st.session_state.execution:
+                execution_status = st.session_state.execution.get("status", "Unknown")
                 elapsed = st.session_state.execution.get("elapsed")
+                status_text = f"Status: {execution_status}"
                 if elapsed is not None:
-                    st.caption(f"Last execution: {elapsed:.3f}s")
+                    status_text += f" • {elapsed:.3f}s"
+                st.markdown(
+                    f'<div style="padding:9px 0;color:#52657f;font-size:12px;font-weight:700;">{html.escape(status_text)}</div>',
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.markdown(
+                    '<div style="padding:9px 0;color:#687a91;font-size:12px;">No verification run yet.</div>',
+                    unsafe_allow_html=True,
+                )
 
         if run_button:
-            with st.spinner("Compiling and running..."):
+            with st.spinner("Compiling and running the AI-corrected code..."):
                 execution = run_judge0(
                     corrected,
                     selected_language,
@@ -1762,7 +1960,7 @@ else:
             st.rerun()
 
         execution = st.session_state.execution
-        out_col, err_col = st.columns(2)
+        out_col, err_col = st.columns(2, gap="medium")
 
         with out_col:
             st.markdown(
@@ -1772,7 +1970,7 @@ else:
             output = (
                 execution.get("stdout", "")
                 if execution else
-                "Run the corrected code to see output."
+                "Press “Run Corrected Code” to verify the generated program."
             )
             st.markdown(
                 f'<div class="output-body">{html.escape(output or "(no output)")}</div></div>',
@@ -1781,7 +1979,7 @@ else:
 
         with err_col:
             st.markdown(
-                '<div class="output-panel"><div class="output-head">Compiler / Runtime Messages</div>',
+                '<div class="output-panel"><div class="output-head">Compiler / Runtime Verification</div>',
                 unsafe_allow_html=True,
             )
 
@@ -1789,14 +1987,15 @@ else:
                 message = execution.get("stderr", "") or execution.get("compile_output", "")
                 if execution.get("message"):
                     message = f"{message}\n{execution['message']}".strip()
+
                 if execution.get("ok"):
-                    message = message or "Compilation successful. Exit code: 0"
+                    message = message or "Compilation and execution succeeded."
                     cls = "output-body"
                 else:
                     message = message or execution.get("status", "Execution failed.")
                     cls = "output-body output-error"
             else:
-                message = "No execution yet."
+                message = "No verification result yet."
                 cls = "output-body"
 
             st.markdown(
@@ -1804,14 +2003,54 @@ else:
                 unsafe_allow_html=True,
             )
 
-    pdf_data = make_pdf(selected_language, source, result)
+    # Prominent final report feature
+    st.markdown(
+        """
+        <div class="report-highlight">
+            <div class="report-title">▤  Final Analysis Report</div>
+            <div class="report-subtitle">
+                Download the complete project report: original code, corrected code,
+                issues, explanations, complexity, optimization, security review,
+                notes, and execution verification.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    pdf_result = dict(result)
+    if st.session_state.execution:
+        pdf_result["execution_status"] = st.session_state.execution.get("status", "")
+        pdf_result["execution_stdout"] = st.session_state.execution.get("stdout", "")
+        pdf_result["execution_stderr"] = st.session_state.execution.get("stderr", "")
+        pdf_result["execution_compile_output"] = st.session_state.execution.get("compile_output", "")
+        pdf_result["execution_time"] = st.session_state.execution.get("elapsed", "")
+
+    pdf_data = make_pdf(selected_language, source, pdf_result)
+
     st.download_button(
-        "Download Analysis Report (PDF)",
+        "⬇  Download Final Analysis Report (PDF)",
         data=pdf_data,
-        file_name="Code_Annotation_Ai_Report.pdf",
+        file_name="Code_Annotation_Ai_Final_Report.pdf",
         mime="application/pdf",
         use_container_width=True,
+        key="download_final_report",
     )
+
+else:
+    st.markdown(
+        """
+        <div class="section-card">
+            <div class="section-head">AI Results</div>
+            <div class="section-body">
+                Analyze your code to display corrected code, explanation, complexity,
+                optimization, security, notes, and verification tools.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
 
 # Footer
 # ============================================================
