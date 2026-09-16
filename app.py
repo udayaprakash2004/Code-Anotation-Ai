@@ -1,4 +1,5 @@
 import ast
+import base64
 import html
 import json
 import os
@@ -30,6 +31,7 @@ st.set_page_config(
 
 APP_TITLE = "Code Annotation Ai"
 APP_SUBTITLE = "a web-compiler"
+LOGO_PATH = Path("logo.png")
 MAX_CODE = 30000
 JUDGE0_URL = st.secrets.get(
     "JUDGE0_URL",
@@ -55,19 +57,22 @@ st.markdown(
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
+
     :root {
-        --bg: #f5f7fa;
+        --bg: #f6f8fb;
         --surface: #ffffff;
-        --surface-2: #fbfcfe;
-        --ink: #172033;
-        --muted: #647084;
-        --border: #dfe4ec;
-        --brand: #4f46e5;
-        --brand-dark: #3730a3;
-        --success: #149447;
-        --danger: #d9343a;
-        --warning: #d98700;
-        --editor: #1f1f1f;
+        --surface-2: #f9fbfd;
+        --ink: #15223a;
+        --muted: #64748b;
+        --border: #dce4ef;
+        --brand: #2563eb;
+        --brand-dark: #173a8f;
+        --navy: #0f1f3d;
+        --navy-2: #162a52;
+        --success: #178a4d;
+        --danger: #cc3340;
+        --warning: #b96d00;
+        --editor: #1e1e1e;
     }
 
     * { box-sizing: border-box; }
@@ -77,7 +82,9 @@ st.markdown(
     }
 
     .stApp {
-        background: var(--bg);
+        background:
+            radial-gradient(circle at 100% 0%, rgba(37,99,235,.045), transparent 26%),
+            linear-gradient(180deg, #f8fafc 0%, #f4f7fb 100%);
         color: var(--ink);
     }
 
@@ -92,46 +99,48 @@ st.markdown(
 
     .block-container {
         max-width: 1400px;
-        padding: 0 22px 28px 22px;
+        padding: 0 22px 24px 22px;
     }
 
-    /* Compact brand header */
+    /* Official-looking compact header */
     .brand-bar {
-        margin: 0 -22px 12px -22px;
-        padding: 14px 28px 12px 28px;
-        background: linear-gradient(135deg, #23155c, #4b2aa8);
-        color: white;
-        border-bottom: 1px solid rgba(255,255,255,.15);
+        margin: 0 -22px 10px -22px;
+        min-height: 82px;
+        padding: 8px 26px;
+        background: #ffffff;
+        color: var(--ink);
+        border-bottom: 1px solid #dde5ef;
+        box-shadow: 0 2px 12px rgba(15,31,61,.05);
+        display: flex;
+        align-items: center;
     }
 
-    .brand-title {
-        font-size: 28px;
-        line-height: 1.05;
-        font-weight: 800;
-        letter-spacing: -.7px;
-        color: #fff;
-    }
-
-    .brand-subtitle {
-        margin-top: 3px;
-        font-size: 12px;
-        font-weight: 600;
-        color: rgba(255,255,255,.88);
-        letter-spacing: .2px;
+    .brand-logo {
+        display: block;
+        width: 250px;
+        height: 66px;
+        object-fit: contain;
+        object-position: left center;
+        background: #fff;
     }
 
     .brand-nav {
-        text-align: right;
+        justify-content: flex-end;
+        gap: 22px;
         font-size: 12px;
-        font-weight: 600;
-        color: rgba(255,255,255,.9);
-        padding-top: 6px;
+        font-weight: 700;
+        color: #334155;
+        white-space: nowrap;
+    }
+
+    .brand-nav span {
+        cursor: default;
     }
 
     .toolbar-label {
         font-size: 11px;
-        font-weight: 700;
-        color: #687486;
+        font-weight: 750;
+        color: #5f6d82;
         margin: 0 0 5px 1px;
     }
 
@@ -139,20 +148,15 @@ st.markdown(
         background: var(--surface);
         border: 1px solid var(--border);
         border-radius: 10px;
-        box-shadow: 0 4px 16px rgba(20, 30, 50, .05);
+        box-shadow: 0 5px 18px rgba(20, 30, 50, .045);
     }
 
     .card-title {
         padding: 11px 14px;
-        border-bottom: 1px solid #eaedf2;
+        border-bottom: 1px solid #e8edf3;
         font-size: 13px;
-        font-weight: 750;
-        color: #283243;
-    }
-
-    .analysis-card {
-        padding-bottom: 2px;
-        overflow: hidden;
+        font-weight: 800;
+        color: #22314d;
     }
 
     .summary-grid {
@@ -164,7 +168,7 @@ st.markdown(
 
     .summary-item {
         background: #fff;
-        border: 1px solid #e6eaf0;
+        border: 1px solid #e4e9f0;
         border-radius: 8px;
         padding: 10px 11px;
         min-height: 70px;
@@ -172,8 +176,8 @@ st.markdown(
 
     .summary-label {
         font-size: 10px;
-        font-weight: 700;
-        color: #718095;
+        font-weight: 750;
+        color: #718096;
     }
 
     .summary-value {
@@ -181,19 +185,19 @@ st.markdown(
         font-size: 22px;
         line-height: 1.1;
         font-weight: 800;
-        color: #273142;
+        color: #27354d;
     }
 
     .error { color: var(--danger); }
     .warning { color: var(--warning); }
-    .info { color: #2162bd; }
+    .info { color: #1d63c7; }
     .success { color: var(--success); }
 
     .issue-box, .note-box {
         margin: 0 11px 11px 11px;
         padding: 12px;
         background: #fff;
-        border: 1px solid #e5e8ee;
+        border: 1px solid #e3e8ef;
         border-radius: 8px;
         color: #364153;
         font-size: 12px;
@@ -206,27 +210,127 @@ st.markdown(
         margin-bottom: 5px;
     }
 
-    .tabs-wrap {
+    /* Result tabs — always readable, including hover/focus */
+    .stTabs {
         margin-top: 14px;
     }
 
     .stTabs [data-baseweb="tab-list"] {
-        gap: 0;
-        border-bottom: 1px solid var(--border);
-        background: white;
+        gap: 0 !important;
+        border-bottom: 1px solid #dbe3ed !important;
+        background: #ffffff !important;
+        box-shadow: none !important;
     }
 
     .stTabs [data-baseweb="tab"] {
-        color: #58667a !important;
+        color: #334155 !important;
         font-size: 12px !important;
-        font-weight: 700 !important;
-        padding: 11px 15px !important;
-        background: white !important;
+        font-weight: 750 !important;
+        padding: 12px 15px !important;
+        background: #ffffff !important;
+        border: none !important;
+        border-radius: 0 !important;
+        opacity: 1 !important;
+        box-shadow: none !important;
+    }
+
+    .stTabs [data-baseweb="tab"]:hover {
+        color: #173a8f !important;
+        background: #f3f7fd !important;
+    }
+
+    .stTabs [data-baseweb="tab"]:focus,
+    .stTabs [data-baseweb="tab"]:focus-visible {
+        color: #173a8f !important;
+        outline: none !important;
+        box-shadow: inset 0 -2px 0 #2563eb !important;
     }
 
     .stTabs [aria-selected="true"] {
-        color: var(--brand-dark) !important;
-        border-bottom: 2px solid var(--brand) !important;
+        color: #173a8f !important;
+        background: #ffffff !important;
+        border-bottom: 3px solid #2563eb !important;
+    }
+
+    /* Buttons: dark/official with white text for strong contrast */
+    .stButton > button,
+    .stDownloadButton > button {
+        min-height: 38px !important;
+        border-radius: 7px !important;
+        font-weight: 750 !important;
+        color: #ffffff !important;
+        background: #101828 !important;
+        border: 1px solid #101828 !important;
+        box-shadow: 0 2px 5px rgba(15, 23, 42, .08) !important;
+    }
+
+    .stButton > button p,
+    .stButton > button span,
+    .stButton > button div,
+    .stDownloadButton > button p,
+    .stDownloadButton > button span,
+    .stDownloadButton > button div {
+        color: #ffffff !important;
+    }
+
+    .stButton > button:hover,
+    .stDownloadButton > button:hover {
+        color: #ffffff !important;
+        background: #162a52 !important;
+        border-color: #162a52 !important;
+    }
+
+    .stButton > button[kind="primary"] {
+        color: #ffffff !important;
+        background: #2563eb !important;
+        border-color: #2563eb !important;
+    }
+
+    .stButton > button[kind="primary"]:hover {
+        color: #ffffff !important;
+        background: #1d4ed8 !important;
+        border-color: #1d4ed8 !important;
+    }
+
+    .stButton > button[kind="secondary"],
+    .stDownloadButton > button[kind="secondary"] {
+        color: #ffffff !important;
+        background: #101828 !important;
+        border-color: #101828 !important;
+    }
+
+    /* Streamlit's download links/buttons can inherit text colors; force them. */
+    .stDownloadButton a,
+    .stDownloadButton a:hover,
+    .stDownloadButton button,
+    .stDownloadButton button:hover {
+        color: #ffffff !important;
+    }
+
+    .stDownloadButton svg,
+    .stButton svg {
+        fill: #ffffff !important;
+        color: #ffffff !important;
+    }
+
+    div[data-baseweb="select"] > div {
+        min-height: 38px !important;
+        border-radius: 7px !important;
+        border-color: #d7e0eb !important;
+    }
+
+    div[data-baseweb="select"] span {
+        color: #22314d !important;
+        font-weight: 650 !important;
+    }
+
+    .stTextArea textarea {
+        background: white !important;
+        color: #1e293b !important;
+        border-radius: 7px !important;
+        border: 1px solid #d9dfe8 !important;
+        font-family: Consolas, "Courier New", monospace !important;
+        font-size: 12px !important;
     }
 
     .output-panel {
@@ -258,7 +362,7 @@ st.markdown(
     }
 
     .footer {
-        padding: 18px 0 4px 0;
+        padding: 14px 0 2px 0;
         text-align: center;
         color: #7c8798;
         font-size: 11px;
@@ -268,38 +372,6 @@ st.markdown(
         color: #748095;
         font-size: 11px;
         line-height: 1.45;
-    }
-
-    .stButton > button,
-    .stDownloadButton > button {
-        border-radius: 7px !important;
-        font-weight: 700 !important;
-        min-height: 38px !important;
-    }
-
-    .stButton > button[kind="primary"] {
-        background: var(--brand) !important;
-        border-color: var(--brand) !important;
-        color: white !important;
-    }
-
-    .stButton > button:hover,
-    .stDownloadButton > button:hover {
-        border-color: var(--brand) !important;
-    }
-
-    div[data-baseweb="select"] > div {
-        min-height: 38px !important;
-        border-radius: 7px !important;
-    }
-
-    .stTextArea textarea {
-        background: white !important;
-        color: #1e293b !important;
-        border-radius: 7px !important;
-        border: 1px solid #d9dfe8 !important;
-        font-family: Consolas, "Courier New", monospace !important;
-        font-size: 12px !important;
     }
 
     @media (max-width: 900px) {
@@ -321,22 +393,48 @@ st.markdown(
 # Branding
 # ============================================================
 
-h1, h2 = st.columns([3.3, 1])
-with h1:
-    st.markdown(
-        f"""
-        <div class="brand-bar">
-            <div class="brand-title">{APP_TITLE}</div>
-            <div class="brand-subtitle">{APP_SUBTITLE}</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-with h2:
+def load_logo_data_uri(path):
+    try:
+        raw = Path(path).read_bytes()
+        encoded = base64.b64encode(raw).decode("ascii")
+        return f"data:image/png;base64,{encoded}"
+    except OSError:
+        return ""
+
+logo_uri = load_logo_data_uri(LOGO_PATH)
+
+left_brand, right_brand = st.columns([2.1, 1.0], gap="small")
+with left_brand:
+    if logo_uri:
+        st.markdown(
+            f"""
+            <div class="brand-bar">
+                <img class="brand-logo" src="{logo_uri}" alt="Code Annotation Ai logo">
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            f"""
+            <div class="brand-bar">
+                <div>
+                    <div style="font-size:26px;font-weight:800;color:#0f1f3d;">{APP_TITLE}</div>
+                    <div style="font-size:12px;font-weight:650;color:#4b6ea8;">{APP_SUBTITLE}</div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+with right_brand:
     st.markdown(
         """
         <div class="brand-bar brand-nav">
-            Home&nbsp;&nbsp;&nbsp; Analyze&nbsp;&nbsp;&nbsp; Run&nbsp;&nbsp;&nbsp; Report
+            <span>Home</span>
+            <span>Analyze</span>
+            <span>Run</span>
+            <span>Report</span>
         </div>
         """,
         unsafe_allow_html=True,
