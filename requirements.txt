@@ -1,4 +1,7 @@
-streamlit>=1.45
+streamlit>=1.45,<2
 groq>=0.30
 requests>=2.31
 fpdf2>=2.8
+matplotlib>=3.8
+numpy>=1.26
+streamlit-ace>=0.1.1
