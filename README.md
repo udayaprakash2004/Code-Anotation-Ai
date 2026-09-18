@@ -1,166 +1,58 @@
-Code Annotation Ai
-a web-compiler
-Code Annotation Ai is an AI-powered code analysis and web-compiler application built with Streamlit. It lets users write or paste code, analyze it with AI, inspect detected issues, view corrected code, study time and space complexity, verify executable code, and download a final PDF analysis report.
-Features
-Dark syntax-highlighted Ace code editor
-C, C++, Java, Python, JavaScript, HTML, and CSS support
-Built-in code examples
-Groq-powered AI code analysis
-Syntax, structural, logic, and quality issue reporting
-AI-generated corrected code
-Explanation of detected issues and fixes
-Time and space complexity analysis
-Always-visible Matplotlib complexity growth graphs
-Run and verify corrected C, C++, Java, Python, and JavaScript code through Judge0
-Custom stdin input
-HTML and CSS browser preview
-Optimization recommendations
-Security review
-Learning notes
-Downloadable corrected source code
-Final Analysis Report as a PDF
-Professional light interface with dark code editor and Code Annotation Ai branding
-How It Works
-Enter Code
-    |
-    v
-Select Language
-    |
-    v
-Local Checks + Groq AI Analysis
-    |
-    +--> Errors / Warnings / Info
-    +--> Corrected Code
-    +--> Explanation
-    +--> Time & Space Complexity
-    +--> Optimization
-    +--> Security
-    +--> Notes
-    |
-    +--> Complexity Growth Graphs
-    |
-    +--> Run / Verify Corrected Code
-    |
-    +--> Download Final PDF Report
-Technology Stack
-Area               Technology
-Web framework      Streamlit AI analysis        Groq API Default AI model   openai/gpt-oss-120b Code editor        Streamlit Ace Code execution     Judge0 Graphs             Matplotlib + NumPy PDF reports        fpdf2 HTTP requests      Requests
-Supported Languages
-Analysis and editor
-C
-C++
-Java
-Python
-JavaScript
-HTML
-CSS
-Judge0 execution
-C
-C++
-Java
-Python
-JavaScript
-HTML and CSS use an in-app browser preview instead of Judge0 execution.
-Project Structure
-Code-Anotation-Ai/
+# Code Annotation Ai
+
+![Python](https://img.shields.io/badge/Python-3.8%2B-blue?style=flat-square&logo=python&logoColor=white)
+![Streamlit](https://img.shields.io/badge/Streamlit-App-FF4B4B?style=flat-square&logo=streamlit&logoColor=white)
+![License](https://img.shields.io/badge/License-Proprietary-red?style=flat-square)
+
+**Code Annotation Ai** is a comprehensive web-compiler and AI-powered code analysis application built with Streamlit. It allows developers and students to write or paste code, analyze it using AI, inspect detected issues, view corrected code, study algorithmic complexity, and securely execute code to verify functionality. 
+
+**Live Application:** [Code Annotation Ai Web-Compiler](https://code-anotation-ai-webcompiler.streamlit.app/)
+
+---
+
+## Features
+
+* **Dark Syntax-Highlighted Editor:** Powered by Streamlit Ace with support for C, C++, Java, Python, JavaScript, HTML, and CSS.
+* **AI Code Analysis:** Utilizes the Groq API to provide syntax, structural, logic, and quality issue reporting.
+* **Intelligent Corrections:** Automatically generates corrected code alongside detailed explanations of fixes.
+* **Complexity Analysis:** Calculates Time and Space complexity, accompanied by always-visible Matplotlib growth graphs.
+* **Live Code Execution:** Run and verify C, C++, Java, Python, and JavaScript via a secure Judge0 integration (includes custom stdin support).
+* **Web Preview:** Dedicated in-app browser preview for HTML and CSS.
+* **Comprehensive Insights:** Receive optimization recommendations, security reviews, and detailed learning notes.
+* **Downloadable PDF Reports:** Generate and download a final project report containing all analysis metrics, executed outputs, and original/corrected code using `fpdf2`.
+
+---
+
+## Architecture & Workflow
+
+```text
+Enter Code | Select Language
+       |
+       +--> Local Checks + Groq AI Analysis
+              |
+              +--> Errors / Warnings / Info
+              +--> Corrected Code
+              +--> Explanation
+              +--> Time & Space Complexity
+              +--> Optimization Recommendations
+              +--> Security Review
+              +--> Learning Notes
+              |
+              +--> Complexity Growth Graphs (Matplotlib)
+              +--> Run / Verify Corrected Code (Judge0)
+              +--> Download Final PDF Report
+Technology StackAreaTechnologyWeb FrameworkStreamlitAI AnalysisGroq API (Default model: openai/gpt-oss-120b)Code EditorStreamlit AceCode ExecutionJudge0Data VisualizationMatplotlib, NumPyPDF Generationfpdf2HTTP RequestsRequestsProject StructurePlaintextCode-Anotation-Ai/
+├── .devcontainer/
 ├── app.py
-├── requirements.txt
 ├── logo.png
-├── README.md
-└── .devcontainer/
-The application currently loads the logo with:
-LOGO_PATH = Path("logo.png")
-Therefore, keep logo.png in the repository root beside app.py.
-Installation
-Clone
-git clone https://github.com/udayaprakash2004/Code-Anotation-Ai.git
+├── requirements.txt
+└── README.md
+Note: The application loads the branding logo from logo.png. This file must remain in the repository root beside app.py.InstallationClone the repository:Bashgit clone [https://github.com/udayaprakash2004/Code-Anotation-Ai.git](https://github.com/udayaprakash2004/Code-Anotation-Ai.git)
 cd Code-Anotation-Ai
-Install dependencies
-pip install -r requirements.txt
-Run
-streamlit run app.py
-API Configuration
-The application reads these values from Streamlit secrets or environment variables:
-GROQ_API_KEY --- required for AI analysis
-JUDGE0_API_KEY --- optional depending on the Judge0 deployment
-JUDGE0_URL --- optional; defaults to https://ce.judge0.com
-GROQ_MODEL --- optional; defaults to openai/gpt-oss-120b
-For Streamlit Cloud, configure the secrets in the application's Secrets settings.
-Example:
-GROQ_API_KEY = "your_groq_api_key"
-JUDGE0_API_KEY = "your_judge0_api_key"
-JUDGE0_URL = "https://ce.judge0.com"
-Never commit API keys to GitHub.
-Usage
-Select a programming language.
-Enter or paste code into the editor.
-Optionally select and load an example.
-Enter custom stdin if the program requires input.
-Click Analyze.
-Review the corrected code, explanation, optimization, security, notes, and complexity information.
-For executable languages, click Run Corrected Code to verify the generated code.
-Review program output and compiler/runtime messages.
-Click Download Final Analysis Report (PDF) to generate the final project report.
-Complexity Visualization
-The application displays theoretical algorithmic growth curves for recognized Big-O forms such as:
-O(1)
-O(log n)
-O(n)
-O(n log n)
-O(n²)
-O(n³)
-O(2^n)
-O(n!)
-The graph represents theoretical growth and is not a measured benchmark of one execution.
-For HTML and CSS, algorithmic complexity is normally reported as N/A.
-PDF Report
-The PDF report is a central feature of Code Annotation Ai. It can contain:
-Analysis summary
-Errors
-Warnings
-Informational findings
-Time complexity and explanation
-Space complexity and explanation
-Optimization recommendations
-Security review
-Notes
-Verification status
-Execution time
-Program output
-Compiler/runtime messages
-Original code
-Corrected code
-Execution Notes
-Supported executable code is submitted to Judge0. The application configures CPU, wall-clock, and memory limits and disables network access for the submission.
-Do not submit passwords, API keys, private keys, tokens, or other confidential code unless you understand the privacy and security implications of the external AI and execution services.
-Requirements
-streamlit>=1.45,<2
-groq>=0.30
-requests>=2.31
-fpdf2>=2.8
-matplotlib>=3.8
-numpy>=1.26
-streamlit-ace>=0.1.1
-Streamlit Deployment
-Push app.py, requirements.txt, logo.png, and README.md to GitHub.
-Create a Streamlit Community Cloud application.
-Select the repository and main branch.
-Set the main file to app.py.
-Add the required API secrets.
-Deploy.
-Keep logo.png in the same directory as app.py.
-Future Enhancements
-More programming languages
-Advanced compiler diagnostics
-Test-case management
-Project history
-User authentication
-More detailed performance benchmarking
-Downloadable complexity charts
-Improved HTML/CSS/JavaScript preview
-Code formatting and linting
-Project
-Code Annotation Ai --- a web-compiler
-Built with Streamlit, Groq, Judge0, Matplotlib, NumPy, Streamlit Ace, and fpdf2.
-app:-
-https://code-anotation-ai-3zdmrctb8uhfdqpqgukcyv.streamlit.app/
+Install dependencies:Bashpip install -r requirements.txt
+Run the application:Bashstreamlit run app.py
+API ConfigurationThe application requires specific environment variables or Streamlit secrets to function. Create a .streamlit/secrets.toml file locally or configure these in your Streamlit Community Cloud settings:Ini, TOMLGROQ_API_KEY = "your_groq_api_key"           # Required for AI analysis
+JUDGE0_API_KEY = "your_judge0_api_key"       # Optional depending on Judge0 deployment
+JUDGE0_URL = "[https://ce.judge0.com](https://ce.judge0.com)"         # Optional (defaults to this URL)
+GROQ_MODEL = "openai/gpt-oss-120b"           # Optional (defaults to this model)
+Security Warning: Never commit your API keys or secrets.toml file to GitHub.Usage GuideSelect a programming language from the dropdown.Enter or paste your code into the editor (or load a built-in example).If your program requires input, provide it in the custom stdin field.Click Analyze to trigger the Groq AI review.Review the generated insights, including corrected code, optimization tips, and Big-O complexity graphs.For supported executable languages, click Run Corrected Code to securely verify the output and review compiler/runtime messages.Click Download Final Analysis Report (PDF) to export a professional document of your session.Execution Constraints & SecurityExecutable code is submitted to a Judge0 environment. The application automatically configures strict CPU, wall-clock, and memory limits, and disables network access for the submission.Disclaimer: Do not submit passwords, active API keys, private keys, or highly confidential code, as they will be processed by external AI (Groq) and execution (Judge0) services.RequirementsEnsure your environment meets the following specifications (requirements.txt):streamlit>=1.45,<2groq>=0.30requests>=2.31fpdf2>=2.8matplotlib>=3.8numpy>=1.26streamlit-ace>=0.1.1Streamlit DeploymentTo deploy on Streamlit Community Cloud:Push app.py, requirements.txt, logo.png, and README.md to your GitHub repository.Create a new Streamlit Community Cloud application.Select your repository and target branch.Set the main file path to app.py.Under Advanced Settings, add your required API secrets.Click Deploy.Future EnhancementsSupport for additional programming languages.Advanced compiler diagnostics.Test-case management and assertion frameworks.Project history and session persistence.User authentication and role management.Granular performance benchmarking.Downloadable complexity charts.Code formatting and local linting integration.License & CopyrightCopyright (c) 2026 Udaya Prakash. All Rights Reserved.This software and its source code are proprietary and confidential.No permission is granted to any person or organization to use, copy, modify, distribute, reproduce, publish, sublicense, sell, or create derivative works from this software or any part of this repository without prior written permission from the copyright owner.Unauthorized use, copying, modification, distribution, or reproduction of this software or its source code is prohibited.For permission to use any part of this repository, please contact the copyright owner.
