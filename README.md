@@ -41,18 +41,130 @@ Enter Code | Select Language
               +--> Complexity Growth Graphs (Matplotlib)
               +--> Run / Verify Corrected Code (Judge0)
               +--> Download Final PDF Report
-Technology StackAreaTechnologyWeb FrameworkStreamlitAI AnalysisGroq API (Default model: openai/gpt-oss-120b)Code EditorStreamlit AceCode ExecutionJudge0Data VisualizationMatplotlib, NumPyPDF Generationfpdf2HTTP RequestsRequestsProject StructurePlaintextCode-Anotation-Ai/
+## Technology Stack
+
+* **Web Framework:** Streamlit
+* **AI Analysis:** Groq API (Default model: openai/gpt-oss-120b)
+* **Code Editor:** Streamlit Ace
+* **Code Execution:** Judge0
+* **Data Visualization:** Matplotlib, NumPy
+* **PDF Generation:** fpdf2
+* **HTTP Requests:** Requests
+
+---
+
+## Project Structure
+
+```text
+Code-Anotation-Ai/
 ├── .devcontainer/
 ├── app.py
 ├── logo.png
 ├── requirements.txt
 └── README.md
-Note: The application loads the branding logo from logo.png. This file must remain in the repository root beside app.py.InstallationClone the repository:Bashgit clone [https://github.com/udayaprakash2004/Code-Anotation-Ai.git](https://github.com/udayaprakash2004/Code-Anotation-Ai.git)
+
+Installation
+Clone the repository:
+
+Bash
+git clone [https://github.com/udayaprakash2004/Code-Anotation-Ai.git](https://github.com/udayaprakash2004/Code-Anotation-Ai.git)
 cd Code-Anotation-Ai
-Install dependencies:Bashpip install -r requirements.txt
-Run the application:Bashstreamlit run app.py
-API ConfigurationThe application requires specific environment variables or Streamlit secrets to function. Create a .streamlit/secrets.toml file locally or configure these in your Streamlit Community Cloud settings:Ini, TOMLGROQ_API_KEY = "your_groq_api_key"           # Required for AI analysis
+Install dependencies:
+
+Bash
+pip install -r requirements.txt
+Run the application:
+
+Bash
+streamlit run app.py
+API Configuration
+The application requires specific environment variables or Streamlit secrets to function. Create a .streamlit/secrets.toml file locally or configure these in your Streamlit Community Cloud settings:
+
+Ini, TOML
+GROQ_API_KEY = "your_groq_api_key"           # Required for AI analysis
 JUDGE0_API_KEY = "your_judge0_api_key"       # Optional depending on Judge0 deployment
 JUDGE0_URL = "[https://ce.judge0.com](https://ce.judge0.com)"         # Optional (defaults to this URL)
 GROQ_MODEL = "openai/gpt-oss-120b"           # Optional (defaults to this model)
-Security Warning: Never commit your API keys or secrets.toml file to GitHub.Usage GuideSelect a programming language from the dropdown.Enter or paste your code into the editor (or load a built-in example).If your program requires input, provide it in the custom stdin field.Click Analyze to trigger the Groq AI review.Review the generated insights, including corrected code, optimization tips, and Big-O complexity graphs.For supported executable languages, click Run Corrected Code to securely verify the output and review compiler/runtime messages.Click Download Final Analysis Report (PDF) to export a professional document of your session.Execution Constraints & SecurityExecutable code is submitted to a Judge0 environment. The application automatically configures strict CPU, wall-clock, and memory limits, and disables network access for the submission.Disclaimer: Do not submit passwords, active API keys, private keys, or highly confidential code, as they will be processed by external AI (Groq) and execution (Judge0) services.RequirementsEnsure your environment meets the following specifications (requirements.txt):streamlit>=1.45,<2groq>=0.30requests>=2.31fpdf2>=2.8matplotlib>=3.8numpy>=1.26streamlit-ace>=0.1.1Streamlit DeploymentTo deploy on Streamlit Community Cloud:Push app.py, requirements.txt, logo.png, and README.md to your GitHub repository.Create a new Streamlit Community Cloud application.Select your repository and target branch.Set the main file path to app.py.Under Advanced Settings, add your required API secrets.Click Deploy.Future EnhancementsSupport for additional programming languages.Advanced compiler diagnostics.Test-case management and assertion frameworks.Project history and session persistence.User authentication and role management.Granular performance benchmarking.Downloadable complexity charts.Code formatting and local linting integration.License & CopyrightCopyright (c) 2026 Udaya Prakash. All Rights Reserved.This software and its source code are proprietary and confidential.No permission is granted to any person or organization to use, copy, modify, distribute, reproduce, publish, sublicense, sell, or create derivative works from this software or any part of this repository without prior written permission from the copyright owner.Unauthorized use, copying, modification, distribution, or reproduction of this software or its source code is prohibited.For permission to use any part of this repository, please contact the copyright owner.
+Security Warning: Never commit your API keys or secrets.toml file to GitHub.
+
+Usage Guide
+Select a programming language from the dropdown.
+
+Enter or paste your code into the editor (or load a built-in example).
+
+If your program requires input, provide it in the custom stdin field.
+
+Click Analyze to trigger the Groq AI review.
+
+Review the generated insights, including corrected code, optimization tips, and Big-O complexity graphs.
+
+For supported executable languages, click Run Corrected Code to securely verify the output and review compiler/runtime messages.
+
+Click Download Final Analysis Report (PDF) to export a professional document of your session.
+
+Execution Constraints & Security
+Executable code is submitted to a Judge0 environment.
+
+The application automatically configures strict CPU, wall-clock, and memory limits, and disables network access for the submission.
+
+Disclaimer: Do not submit passwords, active API keys, private keys, or highly confidential code, as they will be processed by external AI (Groq) and execution (Judge0) services.
+
+Requirements
+Ensure your environment meets the following specifications (requirements.txt):
+
+streamlit>=1.45,<2
+
+groq>=0.30
+
+requests>=2.31
+
+fpdf2>=2.8
+
+matplotlib>=3.8
+
+numpy>=1.26
+
+streamlit-ace>=0.1.1
+
+Streamlit Deployment
+To deploy on Streamlit Community Cloud:
+
+Push app.py, requirements.txt, logo.png, and README.md to your GitHub repository.
+
+Create a new Streamlit Community Cloud application.
+
+Select your repository and target branch.
+
+Set the main file path to app.py.
+
+Under Advanced Settings, add your required API secrets.
+
+Click Deploy.
+
+Future Enhancements
+Support for additional programming languages.
+
+Advanced compiler diagnostics.
+
+Test-case management and assertion frameworks.
+
+Project history and session persistence.
+
+User authentication and role management.
+
+Granular performance benchmarking.
+
+Downloadable complexity charts.
+
+Code formatting and local linting integration.
+
+License & Copyright
+Copyright (c) 2026 Udaya Prakash. All Rights Reserved.
+
+This software and its source code are proprietary and confidential.
+
+No permission is granted to any person or organization to use, copy, modify, distribute, reproduce, publish, sublicense, sell, or create derivative works from this software or any part of this repository without prior written permission from the copyright owner.
+
+Unauthorized use, copying, modification, distribution, or reproduction of this software or its source code is prohibited.
+
+For permission to use any part of this repository, please contact the copyright owner.
